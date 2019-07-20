@@ -12,6 +12,12 @@ The phylogenetic intersection analysis (PIA) takes standard-format BLAST output 
 A very early version was published in Smith et al. ("Sedimentary DNA from a submerged site reveals wheat in the British Isles 8000 years ago.", Science, 2015) and a more current version will be in a forthcoming paper this year. For more information, email r.cribdon@warwick.ac.uk.
 
 
+Prerequisites
+-------------
+-   Perl 5
+-   Perl module List::MoreUtils
+
+
 Files and directories
 ---------------------
 Modules/
@@ -19,18 +25,14 @@ Modules/
     FileManipulations.pm
     FileMerge.pm
     TreeOfLife.pm
-Reference_files/
-    names.dmp
-    nodes.dmp
 Helpfile_PIA.txt
 PIA.pl
 PIA_inner.pl
 
-
-Prerequisites
--------------
--   Perl 5
--   Perl module List::MoreUtils
+You need to make a Reference_files/ directory containing names.dmp and nodes.dmp, which can be downloaded from the NCBI here: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/
+Reference_files/
+    names.dmp
+    nodes.dmp
 
 
 Usage
