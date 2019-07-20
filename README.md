@@ -3,8 +3,11 @@ PROVISIONAL - THIS IS A BETA VERSION
 The Phylogenetic Intersection Analysis
 ======================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
+
 Allaby lab, University of Warwick
+
 Version 4.0
+
 2019-07-20
 
 The phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
@@ -20,19 +23,19 @@ Prerequisites
 
 Files and directories
 ---------------------
-Modules/
-    FileChecks.pm
-    FileManipulations.pm
-    FileMerge.pm
-    TreeOfLife.pm
-Helpfile_PIA.txt
-PIA.pl
-PIA_inner.pl
+-   Modules/
+    -   FileChecks.pm
+    -   FileManipulations.pm
+    -   FileMerge.pm
+    -   TreeOfLife.pm
+-   Helpfile_PIA.txt
+-   PIA.pl
+-   PIA_inner.pl
 
 You need to make a Reference_files/ directory containing names.dmp and nodes.dmp, which can be downloaded from the NCBI here: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/
-Reference_files/
-    names.dmp
-    nodes.dmp
+-   Reference_files/
+    -   names.dmp
+    -   nodes.dmp
 
 
 Usage
