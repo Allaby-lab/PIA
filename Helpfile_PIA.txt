@@ -1,0 +1,16 @@
+Usage: perl PIA.pl -f <fastaHeaderfile> -b <blast.txt> [options]
+
+Main Arguments
+Option	Description			Input		Explanation
+	-f	filename		Y		Enter filename- a list of fasta headers extracted from MEGAN
+	-b	blast filename		Y		Blast filename- full blast output file
+
+
+Optional
+Option	Description			Input		Explanation
+ 	-c 	cap			Y		A cap to use in the PIA analysis- impacts the taxon diversity score 
+	-n 	path			Optional	Relative path to  nodes.dmp if not specified. Default path is ./Reference_files/nodes.dmp
+	-N 	path			Optional	Relative path to names.dmp if not specified. Default path is ./Reference_files/names.dmp
+	-h	help			N		Print helpfile
+	-e	extended summary	N		Option to create an extended summary file- can be slow
+
