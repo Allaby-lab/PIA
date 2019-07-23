@@ -3,12 +3,9 @@ PROVISIONAL - THIS IS A BETA VERSION
 The Phylogenetic Intersection Analysis
 ======================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
-
 Allaby lab, University of Warwick
-
-Version 4.0
-
-2019-07-20
+Version 4.1
+2019-07-22
 
 The phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -19,23 +16,24 @@ Prerequisites
 -------------
 -   Perl 5
 -   Perl module List::MoreUtils
+-   Perl module DB_File
 
 
 Files and directories
 ---------------------
--   Modules/
-    -   FileChecks.pm
-    -   FileManipulations.pm
-    -   FileMerge.pm
-    -   TreeOfLife.pm
--   Helpfile_PIA.txt
--   PIA.pl
--   PIA_inner.pl
+Modules/
+    FileChecks.pm
+    FileManipulations.pm
+    FileMerge.pm
+    TreeOfLife.pm
+Reference_files/
+    names.dmp
+    nodes.dmp
+Helpfile_PIA.txt
+PIA.pl
+PIA_inner.pl
 
-You need to make a Reference_files/ directory containing names.dmp and nodes.dmp, which can be downloaded from the NCBI here: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/
--   Reference_files/
-    -   names.dmp
-    -   nodes.dmp
+You need to make Reference_files/ yourself. Download the latest versions of names.dmp and nodes.dmp from the NCBI here: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
 
 
 Usage
@@ -43,6 +41,7 @@ Usage
 -   Have all PIA scripts and directories in the same directory.
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
     >perl PIA.pl -f [input FASTA] -b [input BLAST file] -t [x number of threads] [other options]
+-   The input FASTA and corresponding input BLAST must have the same headers (sequence names). If the FASTA headers are very long, BLAST may crop them. Change header names if necessary to prevent this.
 -   To run PIA_inner.pl alone, see notes at the top of PIA_inner.pl.
 -   Outputs will be in [input FASTA]_out/.
     -   The intersects file is the full output.
