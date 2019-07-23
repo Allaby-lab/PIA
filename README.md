@@ -17,7 +17,7 @@ Prerequisites
 -   Perl 5
 -   Perl module List::MoreUtils
 -   Perl module DB_File
-
+-   Directory called Reference_files/ containing names.dmp and nodes.dmp from the NCBI: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
 
 Files and directories
 ---------------------
@@ -32,8 +32,6 @@ Reference_files/
 Helpfile_PIA.txt
 PIA.pl
 PIA_inner.pl
-
-You need to make Reference_files/ yourself. Download the latest versions of names.dmp and nodes.dmp from the NCBI here: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
 
 
 Usage
