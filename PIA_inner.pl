@@ -121,19 +121,23 @@
     $log_filehandle->autoflush(1); # Set autoflush to 1 for the log filehandle. This means that Perl won't buffer its output to the log, so the log should be updated in real time.
     print $log_filehandle "#####################################\n";
     
-    # Print output from the last section to the log.
+    # Print run parameters to log.
     print $log_filehandle "Other things found on the command line:\n" if $ARGV[0];
     foreach (@ARGV)	{
     print $log_filehandle "$_\n";
     }
-    print $log_filehandle "\n****Inputs****\nHeader file: $tophitfile\nBLAST file: $blastfile\nCap: $cap (default is 100)\n";
-
+    
+    my $min_coverage_perc = 95; # The default coverage cut-off is 95%. Reads where the top BLAST hit doesn't have 95% coverage will be discarded.
+	my $min_taxdiv_score = 0.1; # The minimum taxonomic diversity score is 0.1. Reads must have at least eleven unique taxa.
+    
+    print $log_filehandle "\n****Inputs****\nHeader file:\t$tophitfile\nBLAST file:\t$blastfile\nMinimum percent coverage for top BLAST hit:\t$min_coverage_perc\nCap of BLAST taxa to examine (default is 100):\t$cap\nMinimum taxonomic diversity score:\t$min_taxdiv_score\n\n";
+    
 
 ##############################################		
 ########### Set up DBM index files ###########
 ##############################################
-    print "Setting up DBM index files...\n";
-    print $log_filehandle "Setting up DBM index files...\n";
+    print "\n\n****Setting up DBM index files****\n";
+    print $log_filehandle "****Setting up DBM index files****\n";
     
     # Names index where keys are names
     #---------------------------------
@@ -269,8 +273,6 @@
 ###################### Run PIA #######################
 ######################################################
     
-	my $min_coverage_perc = 95; # The default coverage cut-off is 95%. Reads where the top BLAST hit doesn't have 95% coverage will be discarded.
-	
 	print "\n****Starting first round of PIA****\n";
 	print $log_filehandle "\n\n****Starting first round of PIA****\n";
 	
@@ -279,7 +281,7 @@
 	print "\nPIA() subroutine finished.\n\n";
 
     # IF NOT ACTUALLY RUNNING THE PIA; FOR TESTING
-	#my $corename = '76.header_out';
+	#my $corename = 'test.header_out';
 
 
 ######################################################	
@@ -288,7 +290,7 @@
 
 ##### Extract simple summary from the intersects file
 	my $tophitfile2="$corename"."/"."$corename.intersects.txt";
-	my $simplesummary = simple_summary($tophitfile2);
+	my $simplesummary = simple_summary($tophitfile2, $min_taxdiv_score);
 
 ##### Extract extended summary (optional) - simple summary with lineage data
 	if ($summary){
@@ -343,7 +345,7 @@ sub extended_summary{
 
 sub simple_summary {
 #### Create simple summary of output- This is the default. An extended summary can be created if -e flag is supplied
-	my ($PIAinputname) = @_; # $PIAinputname is $tophitfile2: basically the header file.
+	my ($PIAinputname, $min_taxdiv_score) = @_; # $PIAinputname is $tophitfile2: basically the header file.
 	
 	my @intersects_file= FileChecks::open_file($PIAinputname);										#FileChecks.pm
 									
@@ -353,7 +355,7 @@ sub simple_summary {
 	foreach my $line (@intersects_file){
 		my @row= split(/, classification intersect: |, id confidence class: /,$line); # Split on the classification intersect field first (note that it won't match to "most distant classification intersect"), followed by the ID confidence field. This is not an 'or'. It's one after the other, chopping off text from the left and right sides to leave just the classification intersect value in the middle.
 		my @check= split(/, taxa diversity score: |, classification intersect: /,$line); # Similarly, leave just the taxa diversity score. 
-		if ($check[1]>=0.1 ){ # $check[1] is the taxa diversity score.
+		if ($check[1]>=$min_taxdiv_score ){ # $check[1] is the taxa diversity score.
 			push @intersects, $row[1]; # $row[1] is the classification intersect. Keep it if the taxa diversity score was at least 0.1.
 		} else {
 			push @intersects, "none found"; # If the taxa diversity score was below 0.1, the classification intersect from now on is "none found".
@@ -434,13 +436,13 @@ sub PIA {
 	#--------------------------------------------------
 	my @tops2 = (); # Will contain reads that pass the coverage check. Remember that each header represents a read.
 
+    
 	foreach my $header (@tops) {
 			my $header2="Query= ". $header; # $header2 is the read header prefaced with "Query= ", so it looks like the start of a BLAST entry.
 			my $read_length_section = `grep -A 5 "$header2" "$blastfile"`; # Search in $blastfile for $header2. Return the two lines after it: a newline and the query length line.
-  
             if (index($read_length_section, '***** No hits found *****') != -1) { next; } # If BLAST did not find any hits, skip this read. The warning is printed just under length.
-                
-			# Coverage is [match length] / [read length]. First, find the read length.
+			
+            # Coverage is [match length] / [read length]. First, find the read length.
 			my @read_length_section0 = split(/Length=/, $read_length_section); # Split $read_length_section on Length= followed by whitespace. Everything in between is the value for read length.
             my @read_length_section = split(/\s/, $read_length_section0[1]);
             my $read_length = $read_length_section[0];
