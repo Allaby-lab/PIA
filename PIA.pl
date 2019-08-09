@@ -6,7 +6,7 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 4.2, 2019-07-29 ###############
+############## Version 4.4, 2019-08-09 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2018
@@ -16,7 +16,7 @@
 # - Collapses hits in the final Summary_Basic.txt.
 # - Does not expect re-PIAing or re-BLASTing or whatnot.
 # - Converts the non-BLAST input file into a header file. This allows it to accept FASTAs as well as ready-made header files.
-		
+
 	use strict;
 	use warnings;
 	use lib './Modules'; # Add the /Modules directory to @INC: the list of places Perl will look for modules. 
@@ -31,7 +31,7 @@
 	use File::Path;
 
 # Run as follows:
-# perl PIA.pl -f [FASTA or corresponding header file] -b [BLAST file] -t [number of threads]
+# perl PIA.pl -f [FASTA or corresponding header file] -b [BLAST file] -p [taxonomic ID of expected phylogenetic range] -t [number of threads]
 
 # Summary:
 # - Check arguments and inputs.
@@ -39,6 +39,8 @@
 # - Collate the x sets of output.
 # - Collate Summary_Basic.txt.
 
+# To do:
+# - Accept IDs in the intersects file and export them in summary basics. Account for them while collating.
 
 ######################################################										#####################
 ########### Check arguments and Input Data ###########										###### Modules ######
@@ -46,61 +48,70 @@
 
 ##### Get arguments from command line #####
 	my %options=();
-	getopts('hf:b:c:egn:N:G:t:', \%options); 														#Getopt::Std
-
+	getopts('f:b:c:C:ehn:N:p:t:', \%options); 														#Getopt::Std
+    
 	# If other text found on command line, do:
 	print "Other things found on the command line:\n" if $ARGV[0];
 	foreach (@ARGV)	{
-							print "$_\n";
-	}
-
-##### Check other commandline arguments and store #####
-	#Display help file and exit if -h flag called #		
-	my $helpfile="Helpfile_PIA.txt";
-	if ($options{h}){
-							FileChecks::process_help($helpfile);														#FileChecks.pm	
-	}				
-							
+        print "$_\n";
+	}			
+	
 ##### Check FASTA filename and open file #####
+	# The header file is simply the read names (headers) extracted from a FASTA file. PIA.pl makes the header file.
 	# Ensure that a filename has been given as an argument. -f flag
-	# Get and clean input filename
-	my $fasta_filename =FileChecks::process_filename($options{f});									#FileChecks.pm
-	chomp $fasta_filename;
+	my $fasta_filename = FileChecks::process_filename($options{f});									#FileChecks.pm
+	chomp $fasta_filename ;
 	
 ##### Check BLAST filename and open file #####
 	# Ensure that a filename has been given as an argument. -b flag
-	# Get and clean input filename
- my $blastfile =FileChecks::process_filename($options{b});									#FileChecks.pm
+ 	my $blastfile = FileChecks::process_filename($options{b});									#FileChecks.pm
 	chomp $blastfile ;
-	
-	##### Check see if cap input #####
+
+##### See if cap input #####
+	# The cap impacts the taxon diversity score. Default is 100.	
 	# Ensure that a number has been given as an argument. -c flag
-	my $capopt =($options{c});																	#FileChecks.pm
-	my $cap = 100; # Set it to 100 as a default.
-	if ($capopt) { $cap = $capopt;}
+	my $capopt = ($options{c});
+	my $cap = 100;
+	if ($capopt) { $cap = $capopt;} # If there is an option, overwrite the default.
+
+##### See if min % coverage input #####
+	# The minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
+	# Ensure that a number has been given as an argument. -C flag
+	my $min_coverage_perc_opt = ($options{C});
+	my $min_coverage_perc = 95;
+	if ($min_coverage_perc_opt) { $min_coverage_perc = $min_coverage_perc_opt;} # If there is an option, overwrite the default.
 
 ##### See if extended summary required #####
-	#Create extended summary if -e flag called #		
+	# Create extended summary if -e flag called #		
 	my $summary;
-	if ($options{e}){
-							$summary=1;																				#FileChecks.pm	
-	}	
-	
+	if ($options{e}){ $summary = 1;}	
+
+##### Display help file and exit if -h flag called #####
+	my $helpfile="Helpfile_PIA.txt";
+	if ($options{h}){
+		FileChecks::process_help($helpfile);														#FileChecks.pm	
+	}
+
 ##### Locate nodes.dmp and names.dmp files #####
-	# Check that the path has been included after -l flag
-	# Get and clean input path
+	# If nodes.dmp and names.dmp aren't in their default location (Reference_files/), use -n and -N to specify where they are.	
 	my $nodesfile="Reference_files/nodes.dmp";
-	if ($options{n}){																			#FileChecks.pm
-							$nodesfile=($options{n});
+	if ($options{n}){
+		$nodesfile=($options{n});
 	}
-	my $namesfile="Reference_files/names.dmp";
-	if ($options{N}){																			#FileChecks.pm
-							$namesfile=($options{N});
+	my $namesfile="Reference_files/names.dmp";   
+	if ($options{N}){
+		$namesfile=($options{N});
 	}
+
+##### See if expected phylogenetic range input #####	
+	# Ensure that a number has been given as an argument. -p flag
+	my $expected_phylogenetic_range_opt = ($options{p});
+	my $expected_phylogenetic_range = 1;
+	if ($expected_phylogenetic_range_opt) {$expected_phylogenetic_range = $expected_phylogenetic_range_opt;}
 
 	##### Check see if thread number input #####
 	# Ensure that a number has been given as an argument. -t flag
-	my $threadopt =($options{t});																	#FileChecks.pm
+	my $threadopt = ($options{t});																	#FileChecks.pm
 	my $thread = 2; # Set to 2 by default.
 	if ($threadopt) { $thread = $threadopt;}	
 
@@ -159,7 +170,7 @@ my $shellscript="shellscript.txt";
 unless(open FILE, '>'."$shellscript") { die "\nUnable to create $shellscript\n"; } # If the $shellscript file can't be created, die with an error.
 
 foreach my $file (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.
-		print FILE "perl PIA_inner.pl -f $file -b $blastfile -n $nodesfile -N $namesfile &\n";
+		print FILE "perl PIA_inner.pl -f $file -b $blastfile -p $expected_phylogenetic_range -n $nodesfile -N $namesfile &\n";
 } # So, if we run these commands simultaneously, we'll be processing each of the split header files simultaneously, and that's threading.
 # The fact that the command ends in "&" means that the command is told to run in the background, so new commands can be started on top. The commands should run alongside each other.
 
@@ -221,16 +232,17 @@ my %taxa_and_hits = ();
 foreach my $line (readline($S_filehandle)) {
     
     if (index ($line, '#') != -1) {
-        next; # If the line contains a hash, which indicates the header line, skip it.
+        next; # If the line contains a hash symbol, which indicates the header line, skip it.
     }
     chomp $line;
 	my @line = split("\t", $line);
-	my $taxon = $line[0];
-	my $hit_count = $line[1];
-	if (exists $taxa_and_hits{$taxon}) {
-		$taxa_and_hits{$taxon} = $taxa_and_hits{$taxon} + $hit_count;
+
+    my $taxon_and_ID = $line[0] . "\t" . $line[1]; # The first two columns are name and ID.
+	my $hit_count = $line[2]; # The final column is count.
+	if (exists $taxa_and_hits{$taxon_and_ID}) {
+		$taxa_and_hits{$taxon_and_ID} = $taxa_and_hits{$taxon_and_ID} + $hit_count;
 	} else {
-		$taxa_and_hits{$taxon} = $hit_count;
+		$taxa_and_hits{$taxon_and_ID} = $hit_count;
     }
 }
 close $S_filehandle;
