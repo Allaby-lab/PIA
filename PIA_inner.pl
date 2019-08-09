@@ -6,33 +6,35 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.2, 2019-07-29 ###############
+############## Version 4.4, 2019-08-09 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
 # A method of metagenomic phylogenetic assignation, designed to be robust to partial representation of organisms in the database		
 		
 # Further edited by Becky Cribdon, UoW 2019.
-# - Names searches now take the scientific name from the names file rather than just the first one to match that taxonomic ID.
+# - Names search only returns scientific names.
 # - Added a log.
-# - Made variable names more consistent and meaningful where appropriate.
+# - Made variable names more consistent and meaningful.
 # - Removed $blastfile2 and functions that were not fully implemented.
 # - Added index files for the names and nodes files.
+# - Names search accounts for duplicate names. It only takes potential names in the expected phylogenetic range, then chooses the one with the highest rank (to be conservative). If multiple names have the highest rank, it chooses from them randomly.
 
 # Issues:
-# - Names search doesn't account for taxonomic trickiness.
-# - @scores is used to check whether the current BLAST taxon is new or has already been seen. The taxon name is also used for this. What does @scores add? Why do we not care about BLAST taxa with the same score (BLAST score and E value) as another?
-# - Add error messages ($!) to all, uh, error messages.
-# - Make the names search case-insensitive. Some BLAST hits are ALL IN CAPITALS FOR SOME REASON.
-# - Also hard-code "H.sapiens" and possibly "Human" if it doesn't come in non-human names like "Human influenza".
+# - Think about class thing. Why stop at class?
+# - At the moment, it accepts things like "Zea mays chloroplast" and "Zea mays full genome" as different BLAST taxa. Should probably take just "Zea mays" instead.
+# - About excluding BLAST hits which have E-values that have already been seen: instead of excluding 'repeats', how about averaging them by finding their intersection and treating that as a read? That's what Smith 2015 implies is happening. HOWEVER, taxonomic diversity should take into account the full list. It's a measure of the database, not the read.
+# - Names search:
+#   - Investigate hard-coding "human" while avoiding things like "Human cosavirus A5".
+#   - Make the names search case-insensitive. Some BLAST hits are ALL IN CAPITALS FOR SOME REASON.
 # - Anything else labelled "to do".
 # Please report any problems to r.cribdon@warwick.ac.uk.
 
 # To run, first create a header file from the final FASTA:
 # > cat test_sample.fasta | grep ">" > test_sample.header
-# Then run PIA_inner.pl giving the header file as -f and a BLAST file as -b.
-# > perl PIA_inner.pl -f test_sample.header -b test_blast.txt
-# The header file lists reads by their query number. The BLAST file contains every read (by query number) and a list of reasonable matches (BLAST hits).
+# Then run PIA_inner.pl giving the header file as -f and a BLAST file as -b. -p is the parent taxon you expect your reads to fall into. It's used to help choose the right taxon when a name matches more than one.
+# > perl -f [FASTA or corresponding header file] -b [BLAST file] -p [taxonomic ID of expected phylogenetic range] 
+# The header file lists reads by their query number. The BLAST file contains every read (by query number) and a list of reasonable matches (BLAST hits). If you use the PIA.pl wrapper, it makes header files for you.
 
 
 	use strict;
@@ -55,60 +57,66 @@
 
 ##### Get arguments from command line #####
 	my %options=();
-	getopts('hf:b:c:egn:N:G:', \%options); 														#Getopt::Std
-	
+	getopts('f:b:c:C:ehn:N:p:', \%options); 														#Getopt::Std
+    
 	# If other text found on command line, do:
 	print "Other things found on the command line:\n" if $ARGV[0];
 	foreach (@ARGV)	{
-	print "$_\n";
-	}
-
-##### Check other commandline arguments and store #####
-	#Display help file and exit if -h flag called #		
-	my $helpfile="Helpfile_PIA.txt";
-	if ($options{h}){
-	FileChecks::process_help($helpfile);														#FileChecks.pm	
-	}				
-							
-	#print "\n****Inputs****\n";
+        print "$_\n";
+	}			
 	
 ##### Check header filename and open file #####
 	# The header file is simply the read names (headers) extracted from a FASTA file. PIA.pl makes the header file.
 	# Ensure that a filename has been given as an argument. -f flag
-	# Get and clean input filename
-	my $tophitfile =FileChecks::process_filename($options{f});									#FileChecks.pm
+	my $tophitfile = FileChecks::process_filename($options{f});									#FileChecks.pm
 	chomp $tophitfile ;
 	
 ##### Check BLAST filename and open file #####
 	# Ensure that a filename has been given as an argument. -b flag
-	# Get and clean input filename
- 	my $blastfile =FileChecks::process_filename($options{b});									#FileChecks.pm
+ 	my $blastfile = FileChecks::process_filename($options{b});									#FileChecks.pm
 	chomp $blastfile ;
-	
+
 ##### See if cap input #####
 	# The cap impacts the taxon diversity score. Default is 100.	
 	# Ensure that a number has been given as an argument. -c flag
-	my $capopt =($options{c});																	#FileChecks.pm
+	my $capopt = ($options{c});
 	my $cap = 100;
-	if ($capopt) { $cap = $capopt;}
-	
+	if ($capopt) { $cap = $capopt;} # If there is an option, overwrite the default.
+
+##### See if min % coverage input #####
+	# The minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
+	# Ensure that a number has been given as an argument. -C flag
+	my $min_coverage_perc_opt = ($options{C});
+	my $min_coverage_perc = 95;
+	if ($min_coverage_perc_opt) { $min_coverage_perc = $min_coverage_perc_opt;} # If there is an option, overwrite the default.
+
 ##### See if extended summary required #####
-	#Create extended summary if -e flag called #		
+	# Create extended summary if -e flag called #		
 	my $summary;
-	if ($options{e}){ $summary = 1;}															#FileChecks.pm		
-	
+	if ($options{e}){ $summary = 1;}	
+
+##### Display help file and exit if -h flag called #####
+	my $helpfile="Helpfile_PIA.txt";
+	if ($options{h}){
+		FileChecks::process_help($helpfile);														#FileChecks.pm	
+	}
+
 ##### Locate nodes.dmp and names.dmp files #####
 	# If nodes.dmp and names.dmp aren't in their default location (Reference_files/), use -n and -N to specify where they are.	
-	# Check that the path has been included after -l flag
-	# Get and clean input path
 	my $nodesfile="Reference_files/nodes.dmp";
-	if ($options{n}){																			#FileChecks.pm
+	if ($options{n}){
 		$nodesfile=($options{n});
 	}
 	my $namesfile="Reference_files/names.dmp";
-	if ($options{N}){																			#FileChecks.pm
+	if ($options{N}){
 		$namesfile=($options{N});
 	}
+
+##### See if expected phylogenetic range input #####	
+	# Ensure that a number has been given as an argument. -p flag
+	my $expected_phylogenetic_range_opt = ($options{p});
+	my $expected_phylogenetic_range = 1;
+	if ($expected_phylogenetic_range_opt) {$expected_phylogenetic_range = $expected_phylogenetic_range_opt;}
 
 
 ######################################
@@ -127,10 +135,9 @@
     print $log_filehandle "$_\n";
     }
     
-    my $min_coverage_perc = 95; # The default coverage cut-off is 95%. Reads where the top BLAST hit doesn't have 95% coverage will be discarded.
-	my $min_taxdiv_score = 0.1; # The minimum taxonomic diversity score is 0.1. Reads must have at least eleven unique taxa.
+	my $min_taxdiv_score = 0.1; # The minimum taxonomic diversity score is 0.1. Reads must have at least eleven unique taxa. This is not an option because it depends on $cap: they are related by maths that I don't know. But it's helpful to see what they both are. 
     
-    print $log_filehandle "\n****Inputs****\nHeader file:\t$tophitfile\nBLAST file:\t$blastfile\nMinimum percent coverage for top BLAST hit:\t$min_coverage_perc\nCap of BLAST taxa to examine (default is 100):\t$cap\nMinimum taxonomic diversity score:\t$min_taxdiv_score\n\n";
+    print $log_filehandle "\n****Inputs****\nHeader file:\t$tophitfile\nBLAST file:\t$blastfile\nExpected phylogenetic range (ID):\t$expected_phylogenetic_range\nMinimum coverage for top BLAST hit:\t$min_coverage_perc %\nCap of BLAST taxa to examine (default is 100):\t$cap\nMinimum taxonomic diversity score:\t$min_taxdiv_score\n\n";
     
 
 ##############################################		
@@ -161,29 +168,23 @@
     while (1) { # Run this loop until "last" is called.
             my $line = <$names_filehandle>; # Read the next line from the names file.
             if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
-    
+
             my @line = split(/\|/, $line); # Split the line by | characters.
-            my $name = $line[1]; # Pick out the name.
-            $name =~ s/^\s+|\s+$//g; # Trim whitespace off the start and end.
-            $name = substr ($name, 0, 52); # Only store the first 52 characters of the name (counting from 0) because the vast majority of BLAST hits are only 52 characters long, followed by an ellipsis. Many taxa have very long names that only differ at the very end, but considering the PIA only outputs species, in my opinion the effect of assigning to the wrong one will be negligible.
+            my $name_full = $line[1]; # Pick out the name.
+            $name_full =~ s/^\s+|\s+$//g; # Trim whitespace off the start and end.
+            
+            my $name = substr ($name_full, 0, 52); # Only store the first 52 characters of the name (counting from 0) because the vast majority of BLAST hits are only 52 characters long, followed by an ellipsis. Many taxa have very long names that only differ at the very end, but considering the PIA only outputs species, in my opinion the effect of assigning to the wrong one will be negligible.
+
             my $ID = $line[0]; # Also get the ID.
             $ID =~ s/^\s+|\s+$//g;
             
-            $namesfileDBMnames{$name} = $ID; # Just assume names are unique (they're not). In reality, some IDs will overwrite each other.
-                
-            ## TO DO: may be helpful when I finally make it account for taxonomic trickiness!
-            ## Have some sort of table where the <angiosperm> label means it will be accepted for data from Viridiplantae but not Metazoa or something.
-            ## Field [2] contains a clarifier if there is taxonomic trickiness, but it also clarifies other things too I think.
-            ## Store both $name and $ID in the hash. If $name doesn't exist, create it as a key and give $ID as the value. If it already exists, check whether $position already exists. If not, add $position to its list.
-            #unless (defined $namesfileDBMnames{$name}) {
-            #    $namesfileDBMnames{$name} = "$ID";
-            #} else {#print "Position: $position\tID: $taxonomic_ID\tValues at start: $taxonomic_ID_positions{$taxonomic_ID}\n";
-            #        if (index ($namesfileDBMnames{$name}, "$ID") == -1) { # If the value for $taxonomic_ID_positions{$taxonomic_ID} does not already contain this $position,
-            #        #print "Value doesn't contain $position\n";            
-            #        $namesfileDBMnames{$name} = $namesfileDBMnames{$name} . "\t$ID";
-            #        #print "Values at end: $taxonomic_ID_positions{$taxonomic_ID}\n";         
-            #        }
-            #}
+            if (exists $line[2]) { # Examine the second names field. This is usually empty, but otherwise gives clarification if the name is also used for another taxon. Or other extra information that isn't relevant to us. But a second names field suggests that this $name may be a duplicate, so check and append the $namesfileDBMnames entry if necessary.
+                if (exists $namesfileDBMnames{$name}) {
+                    $namesfileDBMnames{$name} = $namesfileDBMnames{$name} . "\t$ID";
+                } else {
+                    $namesfileDBMnames{$name} = "$ID";
+                }
+            } # Only doing a hash lookup if there's a second names field saves us doing a hash lookup every time we add to the hash.
     }
     #print Dumper (\%namesfileDBMnames);
     close $names_filehandle;
@@ -279,9 +280,8 @@
 	my ($corename) = PIA($tophitfile, $blastfile, $cap, $namesfile, $min_coverage_perc); # PIA() returns a base name for this sample file. The base name is [header file]_out.
 	print $log_filehandle "\nPIA() subroutine finished.\n\n";
 	print "\nPIA() subroutine finished.\n\n";
-
-    # IF NOT ACTUALLY RUNNING THE PIA; FOR TESTING
-	#my $corename = 'test.header_out';
+    
+	#my $corename = '50.header_out'; # IF NOT ACTUALLY RUNNING THE PIA; FOR TESTING
 
 
 ######################################################	
@@ -289,12 +289,12 @@
 ######################################################
 
 ##### Extract simple summary from the intersects file
-	my $tophitfile2="$corename"."/"."$corename.intersects.txt";
+	my $tophitfile2 = "$corename"."/"."$corename.intersects.txt";
 	my $simplesummary = simple_summary($tophitfile2, $min_taxdiv_score);
 
 ##### Extract extended summary (optional) - simple summary with lineage data
 	if ($summary){
-		extended_summary($simplesummary,$nodesfile,$namesfile);
+		extended_summary($simplesummary, $nodesfile, $namesfile);
 	}
 
 
@@ -329,7 +329,7 @@ sub extended_summary{
 ##### Take simple summary and append lineage information 
 	# Optional= only if -e flag supplied
 	my ($simplesummary, $nodesfile, $namesfile) = @_;
-	open (SUM, $simplesummary) or die "Cannot write simplesummary file\n";
+	open (SUM, $simplesummary) or die "Cannot write simplesummary file\n$!\n";
 	my @original=<SUM>;
 	close SUM;
 	my @simplesum=();
@@ -346,49 +346,51 @@ sub extended_summary{
 sub simple_summary {
 #### Create simple summary of output- This is the default. An extended summary can be created if -e flag is supplied
 	my ($PIAinputname, $min_taxdiv_score) = @_; # $PIAinputname is $tophitfile2: basically the header file.
-	
-	my @intersects_file= FileChecks::open_file($PIAinputname);										#FileChecks.pm
-									
-    # Get a list of classification intersects. Exclude reads with a taxonomic diversity score below 0.1.					
-	my @intersects=();
-	
+    
+	my @intersects_file= FileChecks::open_file($PIAinputname);										#FileChecks.pm					
+	my %intersects = (); # Keys are intersect names and IDs in the format "name (ID)". Values are the number of times that name (ID) occurs.
+    
+    # Get a list of classification intersects where the taxa diversity score was at least $min_taxdiv_score.
 	foreach my $line (@intersects_file){
-		my @row= split(/, classification intersect: |, id confidence class: /,$line); # Split on the classification intersect field first (note that it won't match to "most distant classification intersect"), followed by the ID confidence field. This is not an 'or'. It's one after the other, chopping off text from the left and right sides to leave just the classification intersect value in the middle.
-		my @check= split(/, taxa diversity score: |, classification intersect: /,$line); # Similarly, leave just the taxa diversity score. 
-		if ($check[1]>=$min_taxdiv_score ){ # $check[1] is the taxa diversity score.
-			push @intersects, $row[1]; # $row[1] is the classification intersect. Keep it if the taxa diversity score was at least 0.1.
-		} else {
-			push @intersects, "none found"; # If the taxa diversity score was below 0.1, the classification intersect from now on is "none found".
-		}
-	}
-									
-    # Now count the classification intersects.										
-	my @intersects_with_counts = (); # This will contain the name of each intersect followed by the number of times it occurs in the intersects file. Unfortunately, it will contain this information once for every occurrence!
-	foreach my $intersect(@intersects){
-		my @occurrences = grep (/$intersect/, @intersects); # Gather every occurrence of this $intersect, including the current element.
-		my $intersect_with_count = join("\t", $intersect, scalar (@occurrences)); # scalar (@occurrences) is the number of occurrences of this $intersect.
-		push @intersects_with_counts, $intersect_with_count."\n";
+		my @row= split(/, classification intersect: |, id confidence class: /, $line); # Split on the classification intersect field first (note that it won't match to "most distant classification intersect"), followed by the ID confidence field. This is not an 'or'. It's one after the other, chopping off text from the left and right sides to leave just the classification intersect value in the middle.
+		my @check= split(/, taxa diversity score: |, classification intersect: /, $line); # Similarly, leave just the taxa diversity score.
+        
+        if ($check[1] >= $min_taxdiv_score ){ # $check[1] is the taxa diversity score. 'none found' means there was no intersect.
+            
+            # Change the format of the name field ($row[1]) for outputting.
+            my $name_field = $row[1];
+            my @name_field = split (/ /, $name_field);
+            my $ID = pop @name_field; # The ID is the last word.
+            chomp $ID;
+            $ID =~ tr/()//d; # Remove the parentheses from it (this is transliterate with delete).
+            $name_field = join (" ", @name_field); # Join the remaining words back together. These are the taxon name.
+            my $name_and_ID = $name_field . "\t" . $ID; # Join the name and the ID with a tab.
+            
+            if (exists $intersects{$name_and_ID}) {
+                $intersects{$name_and_ID} = $intersects{$name_and_ID} + 1;
+            } else {
+                $intersects{$name_and_ID} = 1;
+            }
+        }
 	}
     
-	my @name=split (/_/,$PIAinputname); # Pick out a sample name from $PIAinput to use in the output file.
+	my @name=split ("\/",$PIAinputname); # Pick out a sample name from $PIAinputname to use in the output file.
 	my $name=$name[0];
     
-	open (OUT, ">".$PIAinputname."_Summary_Basic.txt") or die "Cannot write outname file\n";
+    my $summary_basic_filename = $name."_Summary_Basic.txt";
+	open (OUT, ">", $PIAinputname . "_Summary_Basic.txt") or die "Cannot write output file\n$!\n";
+    print "PIA input name: $PIAinputname\n";
 	print OUT "#Series:\t$name\n"; # Output $name as a header.
-    
-    # Then output the unique elements in @intersects_with_counts. We only need one statement that Asteridae has 7 reads.
-	my @unique = do { my %seen; grep { !$seen{$_}++ } @intersects_with_counts};
-	foreach my $uniq (@unique){
-		unless ($uniq =~ /none found|all/){
-		print OUT $uniq;
-		}
-	}
-    
-	close OUT;	
-	my $filename=$PIAinputname."_Summary_Basic.txt";
-	return $filename;
-}
 
+    foreach my $intersect (keys %intersects) {
+        unless ($intersect eq "none found\t0") {
+            print OUT $intersect . "\t" . $intersects{$intersect} . "\n";
+        }
+    }
+
+	close OUT;
+	return $summary_basic_filename;
+}
 
 
 sub PIA {
@@ -416,7 +418,7 @@ sub PIA {
     
 	# List the header of each read
 	#-----------------------------
-	open (TOPS, $tophitfile) or die "Cannot open $tophitfile\n"; # Extract headers from the header file. A header is the ID number given to a read, like a name, so a header represents a read. "Header" and "read" are used somewhat interchangably in this code, but it never deals directly with a read. It always works via the header.
+	open (TOPS, $tophitfile) or die "Cannot open $tophitfile\n!$\n"; # Extract headers from the header file. A header is the ID number given to a read, like a name, so a header represents a read. "Header" and "read" are used somewhat interchangably in this code, but it never deals directly with a read. It always works via the header.
 
 	my @tops = (); # @tops will store the headers.
 	
@@ -449,7 +451,6 @@ sub PIA {
             
 			# Then, if there is in fact a sequence, find the match length. This is the length of the top BLAST hit and is also called 'query cover':  how much of the query sequence is covered by the top hit (not necessarily covered perfectly). Identities (number of identical bases) are given as a fraction of coverage. If the identities are 86/92, then coverage is 92 bp, but there are 6 mismatches.
 			# So, like BLAST, the PIA defines "coverage" as the total length covered regardless of whether there are mismatches or not. This is fine.
-            print "$read_length\t";
 			if ($read_length > 0 ){ # Just in case there's a read length of 0... which I'm not sure is possible.
 					my $blast_entry_partial=`sed -n -e '/$header/,/Identities =/ p' "$blastfile"`;
 					# sed is used as a selective print. -n means "no print" and p here means "print if matches". It will print all lines beginning with the first pattern ("$header") and ending with the second pattern ("Identities =") regardless of what goes on in between.
@@ -494,7 +495,7 @@ sub PIA {
 		#---------------------------------------------------------------------------------------------
         # To do: combine with check coverage for each read above?
 		# First, get the full BLAST entry for this read.
-		open (my $blast_filehandle, $blastfile) or die "Cannot open $blastfile\n";
+		open (my $blast_filehandle, $blastfile) or die "Cannot open $blastfile\n$!\n";
 		my $line_contains_header = 0; # A flag. Starts at 0 but actually defaults to 1 once running.
 		my $match = "Query= ".$header; # Put the current header back into BLAST format.
 		my @blast_entry; # This array will store the BLAST entry for the current read.
@@ -554,15 +555,15 @@ sub PIA {
 		}
 	
 		
-		# Find the taxon for each BLAST hit using the names index file
-		#-------------------------------------------------------------
+		# Find the taxonomic ID for each BLAST hit using the names index file
+		#--------------------------------------------------------------------
 		# But only $cap unique taxa for each read! $cap is 100 by default.
 		my $number_of_blast_hits = scalar @blast_hits; # This is NOT the number of unique BLAST taxa.
 		my $number_of_blast_taxa = 0; # *This* is the number of unique BLAST taxa.
         my @blast_info = ();
 		my $lastname = ();
-		my %hit_names = (); # Contains unique BLAST hit names. Only used to check for unique hits. Unique hits are then processed using the full $blast_hit.
-		my @scores = (); # Contains unique BLAST E values. To do: lots of questions about @scores.
+		my %hit_names = (); # Contains unique BLAST hit names. Only used to check for unique hits. Later hit processing uses the full $blast_hit.
+        my @scores = (); # Contains unique BLAST E values. To do: lots of questions about @scores.
         
 		BLASTIT:    foreach my $blast_hit (@blast_hits) {
 
@@ -594,71 +595,160 @@ sub PIA {
                 }
                 $clean_hit_name = join (' ', @clean_hit_name);
                 
-                ## TESTING: Faster to chop out these with extra hash lookups per name?
-                #my %non_org_words;
-                #undef $non_org_words{'strain'}; # There are many names containing "strain" in the names file but, like viruses, the ranks all seem to be "no rank" and therefore useless to the PIA. So trim down to species.
-                #undef $non_org_words{'chloroplast'};
-                #undef $non_org_words{'clone'};
-                #undef $non_org_words{'culture-collection'};
-                #undef $non_org_words{'genome'};
-                #undef $non_org_words{'genomic'};
-                #undef $non_org_words{'hypothetical'};
-                #undef $non_org_words{'large'};
-                #undef $non_org_words{'partial'};
-                #undef $non_org_words{'probable'};
-                #undef $non_org_words{'protein'};
-                #undef $non_org_words{'ribosomal'};
-                #
-                #my @current_hit_name2;
-                #foreach my $word (@current_hit_name) {
-                #    if (exists $non_org_words{$word}) {
-                #        last;
-                #    } else {
-                #        push (@current_hit_name2, $word);
-                #    }
-                #}
-                ##print join (" ", @current_hit_name2);
-                #@current_hit_name = @current_hit_name2;
-                
-				if ( exists $hit_names{$clean_hit_name} ) { # Check whether we've already seen this tidied name.
-					next BLASTIT; # If $current_hit_name is already listed in %hit_names, we've already seen it, so move on.
-					}
-				if ( grep( /^$current_e_value$/, @scores ) ) {
-					#print "Next- Drop-off not reached\n"; # Not my note; what does drop-off mean?
+				if ( exists $hit_names{$clean_hit_name} ) { # If $clean_hit_name is already listed in %hit_names, we've already seen it, so move on.
+					next BLASTIT; 
+				}
+                if ( grep( /^$current_e_value$/, @scores ) ) {
+					#print "Next- Drop-off not reached\n"; # To do: not my note; what does drop-off mean?
 					#print $log_filehandle "Next- Drop-off not reached\n";
-					next BLASTIT; #  If $current_e_value is already listed in @scores, move on. Uh, not sure why. To do. Are we assuming that if the taxon is identical, the score will be identical and vice versa? Is this right? @scores is only used for this purpose. What does drop-off mean?
+					next BLASTIT; #  If $current_e_value is already listed in @scores, move on. Uh, not sure why. To do. Are we assuming that if the taxon is identical, the score will be identical and vice versa? Is this right?
 				}
 				push @scores, $current_e_value; # Note the current E value in @scores. It only contains unique E values, but I don't know why they have to be unique. To do.
-				$hit_names{$clean_hit_name} = undef; # Note the current hit name in %hit_names. It only contains unique names.
+				$hit_names{$clean_hit_name} = undef; # Otherwise, note the name in %hit_names. It only contains unique names.
                 
                 my $current_hit_name = $clean_hit_name; # Keep a copy of $clean_hit_name and save a working copy as $current_hit_name.
                 my @current_hit_name = split(' ', $current_hit_name); # Split the name into words again.
 
                     
-                # Get the taxon ID from the names file.	
+                # Try to match the cleaned BLAST name to the names file 
+                #------------------------------------------------------
                 my %namesfileDBMnames = (); # Set up a hash to hold the names DBM file.
                 tie (%namesfileDBMnames, "DB_File", $namesfileDBMnames) or die "Can't open $namesfileDBMnames:$!\n";
-                
                 my $found = 0;
-                while (@current_hit_name) { # Do the following until last is called or you run out of words in $current_hit_name.
+                
+                NAMELOOP: while (@current_hit_name) { # Do the following until last is called or you run out of words in $current_hit_name.
                     my $current_hit_name = join (' ', @current_hit_name);
                     #print "Match attempt: $current_hit_name\n";
                          
-                    if (exists $namesfileDBMnames{$current_hit_name}) {
-                        # To do: this does not account for names across classification systems. It does not account for taxonomic trickiness.
-                        my @namesfile_info = split ("\t", $namesfileDBMnames{$current_hit_name});
-                        $current_hit_ID = $namesfile_info[0]; # Save out the ID. We'll look up the rest of the information shortly.
-                        $found = 1;
-                        last; # Once a match is found, break out of the loop.
+                    if (exists $namesfileDBMnames{$current_hit_name}) { # If the BLAST name has a match in the names file,
+                        
+                        my @namesfile_matches = split ("\t", $namesfileDBMnames{$current_hit_name}); # See if there is more than one ID under this name.
+                        if (exists $namesfile_matches[1]) { # If there's more than one ID, things gonna get complicated.
+                                my @potential_taxa_in_right_range = (); # If there's more than one ID in the expected phylogenetic range, things gonna get even more complicated.
+                                
+                                print "\t\tMultiple potential matches for '$original_hit_name':";
+                                print $log_filehandle "\t\tMultiple potential matches for '$original_hit_name':";
+
+                                foreach my $potential_taxon (@namesfile_matches) { # For each potential taxon, pull out its clarification and see whether it is within the expected phylogenetic range. For example, if an ID is in Insecta but the reads should all be in Viridiplantae, the ID is not the right one.
+                                        print "\t$potential_taxon";
+                                        print $log_filehandle "\t$potential_taxon";
+   
+                                        if ($potential_taxon == $expected_phylogenetic_range) { # If it's the same as the range, accept it.
+                                                push (@potential_taxa_in_right_range, $potential_taxon);
+                                        } else {
+                                                my @potential_parent_taxa = split("\t", retrieve_taxonomic_structure($potential_taxon, $nodesfileDBM, 0) ); # If not, check the parent IDs.
+                                                @potential_parent_taxa = reverse @potential_parent_taxa; # The expected phylogenetic range is probably a high taxon, so start with the higher parent taxa.
+                                                foreach my $potential_parent_taxon (@potential_parent_taxa) {
+                                                    if ($potential_parent_taxon == $expected_phylogenetic_range) {
+                                                        push (@potential_taxa_in_right_range, $potential_taxon);
+                                                        
+                                                    }
+                                                }
+                                        }
+                                }
+                                print "\n";
+                                print $log_filehandle "\n";
+                                
+                                # If any potential taxa were in the expected phylogenetic range, choose the highest. We can't distinguish between them any further, so assign cautiously. Note that if multiple taxa have the joint highest rank, it will pick randomly because they are stored in a hash.
+                                if (@potential_taxa_in_right_range) {
+                                    my %potential_taxa_in_right_range_ranks = ();
+                                    foreach my $potential_taxon (@potential_taxa_in_right_range) { # Find the taxonomic rank for each one.
+                                        $potential_taxa_in_right_range_ranks{retrieve_rank($potential_taxon, $nodesfileDBM)} = $potential_taxon;
+                                    }
+                                    
+                                    # Pick the taxon with the highest rank. TO DO: there may be a more elegant way to do this than just elsifing all NCBI ranks...
+                                    if (exists $potential_taxa_in_right_range_ranks{superkingdom}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{superkingdom};
+                                        $found = 1;
+                                        last NAMELOOP; # We've assigned a taxon to the BLAST name, so exit the name loop.
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{kingdom}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{kingdom};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{phylum}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{phylum};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{subphylum}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{subphylum};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{class}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{class};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{superorder}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{superorder};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{order}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{order};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{suborder}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{suborder};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{infraorder}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{infraorder};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{parvorder}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{parvorder};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{family}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{family};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{genus}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{genus};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{species}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{species};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    } elsif (exists $potential_taxa_in_right_range_ranks{subspecies}) {
+                                        $current_hit_ID = $potential_taxa_in_right_range_ranks{subspecies};
+                                        $found = 1;
+                                        last NAMELOOP;
+                                    }
+                                }
+                                
+                                # If there were no potential taxa in the expected phylogenetic range, set the output values to null and move on to the next BLAST name.
+                                print "\t\tBLAST hit '$original_hit_name' matched names file, but no matches in the expected phylogenetic range. Setting values to null.\n";
+                                print $log_filehandle "\t\tBLAST hit '$original_hit_name' matched names file, but no matches in the expected phylogenetic range. Setting values to null.\n";
+                                my $current_hit_info = 0 . "\t" . 'undef' . "\t" . 'unassigned'; # Store the default null values.
+                                push (@blast_info, $current_hit_info);
+                                next BLASTIT;
+
+                        } else { # If there's just one ID for this name, things are a lot simpler.
+                                $current_hit_ID = $namesfile_matches[0]; # Save the ID. We'll use this to look up more information shortly.
+                                $found = 1;
+                                last NAMELOOP; # Once a match is found, break out of the loop.  
+                        }
                     } else {
                         pop @current_hit_name; # If no match, take a word off the end of $current_hit_name and try again.
                     }
-                }
-                if ($found == 0) { # There are BLAST hit names that don't follow the formula. In here are some exceptions that I've come across.
-                    # Human:
-                    if (index ($clean_hit_name, 'Human DNA sequence') != -1) { # If the name contains this exact string specifying H. sapiens, give it the H. sapiens ID.
+                } # End of NAMELOOP.
+                
+                if ($found == 0) { # There are BLAST hit names that don't follow the formula. In here are some exceptions that I've come across. There may be a more efficient way to do this.
+                    if ( (index ($clean_hit_name, 'Human DNA sequence') != -1) || (index ($clean_hit_name, 'H.sapiens') != -1 ) ) { # If the name contains either of these exact strings specifying human, give it human ID.
                         $current_hit_ID = '9606';
                         $found = 1; # Mark it as found.
+                    } elsif (index ($clean_hit_name, 'C.sativus') != -1) { # Cucumis sativus and Crocus sativus are the two possible choices, but the BLAST hit I found is to Cucumis, and Cucumis is much better sequenced (including a genome).
+                        $current_hit_ID = '3659';
+                        $found = 1;
+                    } elsif (index ($clean_hit_name, 'Z.mays') != -1) { # Zea mays is the only possible match.
+                        $current_hit_ID = '4577';
+                        $found = 1;
+                    } elsif (index ($clean_hit_name, 'S.lycopersicum') != -1) { # Solanum lycopersicum is the only possible match.
+                        $current_hit_ID = '4081';
+                        $found = 1;
+                    } elsif (index ($clean_hit_name, 'Rice 25S') != -1) { # The ribosomal gene.
+                        $current_hit_ID = '4530';
+                        $found = 1;
                     }
                 }
                 if ($found == 0) { # If the name still hasn't been matched to an ID:
@@ -674,10 +764,12 @@ sub PIA {
                 # Look up the more information about this hit using its ID.
                 $current_hit_name = retrieve_name ($current_hit_ID, $namesfileDBMids);
                 my $current_hit_rank = retrieve_rank ($current_hit_ID, $nodesfileDBM);
+                #print "\t\tMatched '$original_hit_name' to '$current_hit_name ($current_hit_ID, $current_hit_rank)'\n"; # TESTING
+                #print $log_filehandle "\t\tMatched '$original_hit_name' to '$current_hit_name ($current_hit_ID, $current_hit_rank)'\n"; # TESTING
                 my $current_hit_info = $current_hit_ID . "\t" . $current_hit_name . "\t" . $current_hit_rank;
                 
                 push (@blast_info, $current_hit_info); # Each element contains [ID\tname\trank] for one BLAST hit.
-		}
+        } # End of BLASTIT.
         
         #print "Number of unique BLAST taxa for this read: $number_of_blast_taxa\n";
         #print Dumper \@blast_info;
@@ -690,78 +782,80 @@ sub PIA {
         # We have a list of unique BLAST taxa. How different are they?
         #-------------------------------------------------------------
         my $tax_diversity = scalar @blast_info; # $tax_diversity is the number of unique IDs among these BLAST taxa.
-        my @contrastinghit_info = ();  # $contrastinghit is second unique name after the top hit: number 1 if you're counting from 0.
-        my $contrastinghit_name = (); 
+         my $contrastinghit_ID = 0; my $contrastinghit_name = "none found"; # contrastinghit is second BLAST taxon: number 1 if you're counting from 0. Default the values to null.
 		if ($tax_diversity > 1) { # If the BLAST taxa aren't all the same:
-                @contrastinghit_info = split ("\t", $blast_info[1]);
-                $contrastinghit_name = $contrastinghit_info[1]; # Fetch the contrasting hit name from its info array.
-		} else { 
-				$contrastinghit_name = "no hit"; # If the BLAST taxa are all the same, there isn't a contrasting hit.
+                my @contrastinghit_info = split ("\t", $blast_info[1]);
+                $contrastinghit_ID = $contrastinghit_info[0]; # Fetch the contrasting hit ID and name from its info array.
+                $contrastinghit_name = $contrastinghit_info[1]; 
 		}
-
 		# Calculate the taxonomic diversity score.
 		my $tax_diversity_score = ($tax_diversity/$cap) - (1/$cap); # Remember, $tax_diversity is the number of unique BLAST taxa and $cap defaults to 100.
+        print "\t\tTaxa diversity = $tax_diversity\tScore = $tax_diversity_score\n";
+        print $log_filehandle "\t\tTaxa diversity = $tax_diversity\tScore = $tax_diversity_score\n";
 		
         # So, are the top and second BLAST taxa in the same genus? Family? The search down from each taxon stops at class in most cases. If they aren't at least in the same class, it's not a worthy intersection? To do: sounds a little arbitrary.
-		my $intersect = (); my $intersect_rank = (); my $intersect_name = "none found"; my $tophit_route = ();
-        my @tophit_info = split ("\t", $blast_info[0]);
-		if ($tax_diversity == 1) { # If the BLAST taxa are all the same:
-					$intersect_rank = "none"; $intersect = 0; # We can't calculate an intersect.
-		} else {
-                my $tophit_ID = $tophit_info[0];
-				if ($tophit_ID == 0){ # If the BLAST taxa aren't all the same but the top taxon has an ID 0, which means a proper ID was never found and it stayed on the default of 0:
-					$intersect_rank = "none"; $intersect_name = "none found"; # We also can't calculate an intersect.
-				} else { # If the BLAST taxa aren't all the same and the top one is valid:
-						$tophit_route = retrieve_taxonomic_structure ($tophit_ID, $nodesfileDBM); # retrieve_taxonomic_structure() returns the route from this taxon down to either the root (if the taxon rank was higher than class) or down to its parent class (if the taxon rank was class or lower). To do: not sure why there's this difference.
-						my $contrastinghit_ID = $contrastinghit_info[0]; # $contrastinghit_ID is the ID of the second-best taxon.
-						my $contrastinghit_route = retrieve_taxonomic_structure ($contrastinghit_ID, $nodesfileDBM);
+        my $intersect_ID = 0; my $intersect_rank = "none"; my $intersect_name = "none found"; my $tophit_ID = 0; my $tophit_route = 0; # Default the intersect values to null.
+        my @tophit_info = split ("\t", $blast_info[0]); # tophit is the first BLAST taxon. It's the top BLAST hit.
+
+        if ($tax_diversity > 1) { # If the BLAST taxa are not all the same:
+                $tophit_ID = $tophit_info[0];
+
+				unless ($tophit_ID == 0) { # The BLAST taxa might not all be the same, but if the top taxon has ID 0, a proper ID was never found and we can't calculate an intersect.
+                		$tophit_route = retrieve_taxonomic_structure ($tophit_ID, $nodesfileDBM, 1); # retrieve_taxonomic_structure() returns the route from this taxon down to either the root (if the taxon rank was higher than class) or down to its parent class (if the taxon rank was class or lower). To do: not sure why there's this difference.
+	
+						my $contrastinghit_route = retrieve_taxonomic_structure ($contrastinghit_ID, $nodesfileDBM, 1);
                         
-						my $intersect = find_taxonomic_intersect ($tophit_route, $contrastinghit_route); # find_taxonomic_intersect() returns the lowest shared rank between the two routes. If one or more routes were undefined, it returns 0.
-						if ($intersect == 0) {
+						$intersect_ID = find_taxonomic_intersect ($tophit_route, $contrastinghit_route); # find_taxonomic_intersect() returns the lowest shared rank between the two routes. If there wasn't any shared rank or if one or more routes were undefined, it returns an ID of 0.
+						if ($intersect_ID == 0) {
 								$intersect_rank = "none"; $intersect_name = "none found";
 						} else { # If there was an intersect, find its rank and name.
-								$intersect_rank = retrieve_rank ($intersect, $nodesfileDBM);
-								$intersect_name = retrieve_name ($intersect, $namesfileDBMids);
+								$intersect_rank = retrieve_rank ($intersect_ID, $nodesfileDBM);
+								$intersect_name = retrieve_name ($intersect_ID, $namesfileDBMids);
 						}	
 				}
 		}
         
+        my $tophit_name = 'noname';
+        if ($tophit_info[1]) {
+            $tophit_name = $tophit_info[1];
+        }
+
+        
 		# How robust is the intersection?
 		#--------------------------------
-		# To help evaluate the robustness of the first intersect, ascertain the spread of blast hits phylogenetically by taking the bottom hit below cap and getting that intersect: the top intersect.
-		my $topintersect = (); my $topintersect_rank = "none found"; my $bottomhit_name = "none"; my $topintersect_name = "none found"; my $bottomhit_ID = 0;
-		if ($tax_diversity == 1) { $topintersect = "none"; $topintersect_rank = "none found";} # Remember, $tax_diversity is the number of unique BLAST taxa. If there's only one, there are no intersections at all.
-		if ($tax_diversity == 2) { $topintersect = $intersect_rank; $topintersect_rank = $intersect_name; $bottomhit_name = $contrastinghit_name; # If there were only two BLAST taxa, the top intersect is the same as the intersect.
+		# To help evaluate the robustness of the first intersect, ascertain the spread of blast hits phylogenetically by taking the bottom hit (within $cap) and getting that intersect: the top intersect. Note that these things aren't used to calculate or evaluate anything, but they are in the output.
+		my $topintersect_ID = 0; my $topintersect_rank = "none found"; my $topintersect_name = "none found"; my $bottomhit_ID = 0; my $bottomhit_name = "none found"; # Default to null values.
+		if ($tax_diversity == 2) { # If there were only two BLAST taxa, the top intersect is the same as the intersect and the bottom hit is the same as the contrasting hit.
+            $topintersect_ID = $intersect_ID; $topintersect_rank = $intersect_rank; $topintersect_name = $intersect_name;
+            $bottomhit_ID = $contrastinghit_ID; $bottomhit_name = $contrastinghit_name; 
 		}
 		if ($tax_diversity > 2) { # If there were more than two BLAST taxa, it gets more complicated.
 				my $bottomhit = pop @blast_info; # $bottom is the final unique BLAST taxon ID. The least good BLAST match.
                 my @bottomhit_info = split ("\t", $bottomhit);
-                my $bottomhit_ID = $bottomhit_info[0];
-				my $bottomhit_name = $bottomhit_info[1];
-				
-				if ($bottomhit_ID==0){
-					$topintersect = 0; # If the bottom ID is 0, the taxon is invalid, so we can't calculate a top intersect.
-				} else {
-					my $bottomhit_route = retrieve_taxonomic_structure ($bottomhit_ID, $nodesfileDBM); # retrieve_taxonomic_structure() returns the route from this taxon to either its parent class or the root.
-					$topintersect = find_taxonomic_intersect ($tophit_route, $bottomhit_route); # Returns the lowest common taxon for the top and bottom BLAST taxa.
-					
+                $bottomhit_ID = $bottomhit_info[0];
+				$bottomhit_name = $bottomhit_info[1];
+
+				unless ($bottomhit_ID == 0) { # If the bottom hit doesn't have an ID, we can't calculate a top intersect.
+					my $bottomhit_route = retrieve_taxonomic_structure ($bottomhit_ID, $nodesfileDBM, 1); # retrieve_taxonomic_structure() returns the route from this taxon to either its parent class or the root.
+					$topintersect_ID = find_taxonomic_intersect ($tophit_route, $bottomhit_route); # Returns the lowest common taxon for the top and bottom BLAST taxa.	
 				}
-				if ($topintersect == 0) {
-					$topintersect_rank = "none"; $topintersect_name = "none found";
+                
+				if ($topintersect_ID == 0) {			
+                    $topintersect_name = "none found"; #$topintersect_rank = "none";
 				} else {
-					$topintersect_rank = retrieve_rank ($topintersect, $nodesfileDBM); $topintersect_name = retrieve_name ($topintersect, $namesfileDBMids);
-					# $topintersectionclass is the rank of the lowest common taxon between the top and bottom BLAST taxa. $topranking is the name.
+                    $topintersect_name = retrieve_name ($topintersect_ID, $namesfileDBMids); #$topintersect_rank = retrieve_rank ($topintersect_ID, $nodesfileDBM);
 				}
 		}
         
+        
 		# Print all of this information to an intersects.txt file
 		#--------------------------------------------------------
-        my $tophit_name = $tophit_info[1];
-		open (INTERSECTS, ">>".$corename."/"."$corename".".intersects.txt") or die "Cannot write intersects file ".$corename."\n"; # Open intersect file for appending.
+		open (INTERSECTS, ">>".$corename."/"."$corename".".intersects.txt") or die "Cannot write intersects file ".$corename.".intersects.txt\n$!\n"; # Open intersect file for appending.
 
 		chomp $header;
-		print INTERSECTS "Query: $header, first hit: $tophit_name, expect: $expect, identities: $identities, next hit: $contrastinghit_name, last hit: $bottomhit_name, most distant classification intersect: $topintersect_rank, phylogenetic range: $topintersect_name, number of hits: $number_of_blast_hits, taxa diversity score: $tax_diversity_score, classification intersect: $intersect_name, id confidence class: $intersect_rank\n";
-		# Close output file
+		print INTERSECTS "Query: $header, first hit: $tophit_name ($tophit_ID), expect: $expect, identities: $identities, next hit: $contrastinghit_name ($contrastinghit_ID), last hit: $bottomhit_name ($bottomhit_ID), phylogenetic range of hits up to cap: $topintersect_name ($topintersect_ID), number of hits: $number_of_blast_hits, taxa diversity: $tax_diversity, taxa diversity score: $tax_diversity_score, classification intersect: $intersect_name ($intersect_ID)\n";
+		# Note that there was originally "most distant classification intersect" ($topintersect_rank) after "last hit", but I don't see why the rank of $topintersect_name needs to go in the output, especially as all things topintersect are only there for interest. They aren't actually used to calculate or evaluate anything.
+        # Similarly, I removed "id confidence class ($intersect_rank) from the end.
 		close INTERSECTS;
 
 	}
@@ -782,7 +876,8 @@ sub retrieve_name {
         if (exists $namesfileDBMids{$query_ID}) {
             $name = $namesfileDBMids{$query_ID};
         } else {
-            print "ERROR: ID $query_ID is not 0 but was not found in names file. Assuming no name.\n";
+            print "\t\tERROR: ID $query_ID is not 0 but was not found in names file. Assuming no name.\n";
+            print $log_filehandle "\t\tERROR: ID $query_ID is not 0 but was not found in names file. Assuming no name.\n";
         }
     }
     untie %namesfileDBMids;
@@ -792,19 +887,19 @@ sub retrieve_name {
 
 sub find_taxonomic_intersect {
 ##### Compare both taxonomic routes, find intersect
-	my ($first_route, $second_route) = @_;
-	my $intersect = 0; # If either the first or second route aren't defined, return the intersect as 0.
+	my ($first_route, $second_route) = @_; # Routes are the taxonomic IDs of successive parent taxa.
+	my $intersect = 0; # If either the first or second route aren't defined, return the intersect as ID 0.
 	if (defined $first_route && defined $second_route){
 		my @first_route = (); my @second_route = ();
 		@first_route = split (/\t/, $first_route);
 		@second_route = split (/\t/, $second_route);
-		my $connected = 0; # The $connected flag activates when the first shared rank is stored as $intercect and prevents it from being overwritten. Because the routes go from lower to higher taxa, higher shared ranks are ignored. To do: there's probably a more efficient way to achieve this.
+		my $connected = 0; # The $connected flag activates when the first shared rank is stored as $intersect and prevents it from being overwritten. Because the routes go from lower to higher taxa, higher shared ranks are ignored.
 		foreach my $rank (@first_route) { # Start with each rank in the first route.
 			foreach my $otherrank (@second_route) { # Take the ranks in the second route.
 				if ($rank == $otherrank) { # If the ranks match,
 					unless ($connected == 1) { # (If the routes are already flagged as connected, move on to the next rank in the second route.)
 						$connected = 1; # Flag them as connected.
-						$intersect = $rank; # $interesect becomes this shared rank.
+						$intersect = $rank; # $intersect becomes this shared rank.
 					}
 				}
 			}
@@ -837,7 +932,7 @@ sub retrieve_rank {
 
 sub retrieve_taxonomic_structure {
 ##### Get hierarchy from nodes.dmp file
-	my ($query_ID, $nodesfileDBM) = @_; # $query_ID is a non-0 taxonomic ID. $nodesfileDBM is the path to the nodes index file.
+	my ($query_ID, $nodesfileDBM, $stop_at_class) = @_; # $query_ID is a non-0 taxonomic ID. $nodesfileDBM is the path to the nodes index file. $stop_at_class is a 0/1 switch asking whether the route should stop at class (enough for the main PIA) or not (while checking names).
     my $route = undef; # If there's a problem, default the route to undef.
     
     unless ($query_ID == 0) { # ID 0 is not in the nodes file.
@@ -861,7 +956,7 @@ sub retrieve_taxonomic_structure {
         
             if ($query_ID == $next_level_ID) { # If the current node is its parent, we're at the root. We have a route.
                 $exit = 1;
-            } elsif ($rank =~/class/) { # If the current node is ranked class, that's far enough. We have a route.
+            } elsif ($stop_at_class == 1 and $rank =~/class/) { # If the current node is ranked class, that's far enough. We have a route.
                 $exit = 1;
             }
             $query_ID = $next_level_ID; # If we're not yet at the root or a class, move on to the current parent node.
