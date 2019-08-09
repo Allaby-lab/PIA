@@ -8,8 +8,13 @@ Option	Description			Input		Explanation
 
 Optional
 Option	Description			Input		Explanation
- 	-c 	cap			Y		A cap to use in the PIA analysis- impacts the taxon diversity score 
+ 	-c 	cap			Y		Maximum unique BLAST taxa examined (default is 100) - impacts the taxon diversity score. Score threshold is hard-coded as $min_taxdiv_score.
+	-C	min % coverage		Optional	Minimum percentage coverage a top BLAST hit must have for a read to be taken forward (default is 95)
+	-e	extended summary	N		Create an extended summary file - not recently tested and can be slow
+	-h	help			N		Print helpfile
 	-n 	path			Optional	Relative path to  nodes.dmp if not specified. Default path is ./Reference_files/nodes.dmp
 	-N 	path			Optional	Relative path to names.dmp if not specified. Default path is ./Reference_files/names.dmp
-	-h	help			N		Print helpfile
-	-e	extended summary	N		Option to create an extended summary file - not recently tested and can be slow
+	-p	expected phylo range	Optional	Taxonomic ID that should encompass all reads in this sample, eg. "33208" for Metazoa or "2" for Bacteria. Helps assign BLAST hits when taxa share the same name.
+
+PIA.pl only (not PIA_inner.pl)
+	-t	threads			Optional	Split the header file into x subfiles and run PIA_inner.pl on each one (default is 2)

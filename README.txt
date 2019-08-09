@@ -4,8 +4,8 @@ The Phylogenetic Intersection Analysis
 ======================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
-Version 4.2
-2019-07-29
+Version 4.4
+2019-08-07
 
 The phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -39,15 +39,15 @@ PIA_inner.pl
 
 Usage
 ------
--   Have all PIA scripts and directories in the same directory.
+-   Have all PIA scripts and directories in the same directory. Note that you cannot run the PIA on multiple FASTA files in the same directory simultaneously.
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
-    >perl PIA.pl -f [input FASTA] -b [input BLAST file] -t [x number of threads] [other options]
+    >perl PIA.pl -f [input FASTA] -b [input BLAST file] -p [taxonomic ID of expected phylogenetic range] -t [number of threads] [other options]
 -   The input FASTA and corresponding input BLAST must have the same headers (sequence names). If the FASTA headers are very long, BLAST may crop them. Change header names if necessary to prevent this.
 -   To run PIA_inner.pl alone, see notes at the top of PIA_inner.pl.
 -   Outputs will be in [input FASTA]_out/.
     -   The intersects file is the full output.
     -   The summary basic file is a simple list of how many reads were assigned to which phylogenetic intersections.
-    -   The log tracks which reads (headers) have been processed. Use this to pick up where you left off if the PIA is interrupted. It also states when a BLAST hit could not be found in names.dmp.
+    -   The log tracks which reads (headers) have been processed. Use this to pick up where you left off if the PIA is interrupted. It also states when a BLAST hit could not be matched to names.dmp.
     -   The timer states how long PIA.pl took to run.
 
 Please report any problems to r.cribdon@warwick.ac.uk.
@@ -56,6 +56,7 @@ Please report any problems to r.cribdon@warwick.ac.uk.
 Known issues
 ------------
 -   The extended summary function is untested.
--   BLAST hits are assigned to taxa using names.dmp. The PIA currently cannot distinguish between synonymous taxa, as can happen across kingdoms. If a BLAST hit is to Iris, it will be    randomly assigned to either Iris the angiosperm or Iris the mantid. This may cause reads to be unnecessarily discarded if it affects the top or second-best hit.
--   Results will change depending on the names.dmp file used. BLAST hits that could not be found in names.dmp will be noted in the log file. These hits will still count towards the taxonomic diversity score, but cannot be used to generate an intersection. This may also cause reads to be unnecessarily discarded if it affects the top or second-best hit.
+-   BLAST hits are assigned to taxa using names.dmp. If there are matches to synonymous taxa, such as Iris the angiosperm and Iris the mantid, the PIA will exclude matches that do not fall in the expected phylogenetic range and then choose the match with the highest rank. If multiple matches have the highest rank, it will choose between them randomly.
+-   BLAST hits that could not be found in names.dmp will be noted in the log file. These hits will still count towards the taxonomic diversity score, but cannot be used to generate an intersection. This may also cause reads to be unnecessarily discarded if it affects the top or second-best hit.
 -   A few BLAST hits (often to human sequences) do not follow the normal naming convention. I am slowly improving the name search function to pick these up.
+-   Also, more recent names.dmp files contain more names so may allow more matches, so results can change with names.dmp versions.
