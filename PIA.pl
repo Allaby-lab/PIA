@@ -6,7 +6,7 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 4.4, 2019-08-09 ###############
+############## Version 4.4, 2019-08-13 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2018
@@ -118,7 +118,7 @@
 
 # Start timer file
 #-----------------
-my $timer_filename = 'timer.txt';
+my $timer_filename = 'timer_' . $fasta_filename . '.txt';
 open( my $timer_filehandle, '>', $timer_filename) or die "Cannot open $timer_filename for writing.\n$!\n"; # Note: this will overwrite old timer. I didn't see any point in appending old ones when you need to remove the other PIA outputs before running it again anyway.
 use IO::Handle; # Enable autoflush.
 $timer_filehandle -> autoflush(1); # Set autoflush to 1 for the log filehandle. This means that Perl won't buffer its output to the log, so the log should be updated in real time.
@@ -166,7 +166,7 @@ my $splitfiles =`ls . | grep $header_filename.`; # "ls ." lists the files and di
 my @splitfiles= split /\n/, $splitfiles; # Save that list in @splitfiles.
 
 # Make the command file.
-my $shellscript="shellscript.txt";
+my $shellscript = 'shellscript_' . $header_filename . '.txt';
 unless(open FILE, '>'."$shellscript") { die "\nUnable to create $shellscript\n"; } # If the $shellscript file can't be created, die with an error.
 
 foreach my $file (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.

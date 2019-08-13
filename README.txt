@@ -5,7 +5,7 @@ The Phylogenetic Intersection Analysis
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
 Version 4.4
-2019-08-07
+2019-08-13
 
 The phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -39,7 +39,7 @@ PIA_inner.pl
 
 Usage
 ------
--   Have all PIA scripts and directories in the same directory. Note that you cannot run the PIA on multiple FASTA files in the same directory simultaneously.
+-   Have all PIA scripts and directories in the same directory. Note that you should be able to run the PIA on multiple FASTA files in the same directory simultaneously, but this has not been thoroughly tested.
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
     >perl PIA.pl -f [input FASTA] -b [input BLAST file] -p [taxonomic ID of expected phylogenetic range] -t [number of threads] [other options]
 -   The input FASTA and corresponding input BLAST must have the same headers (sequence names). If the FASTA headers are very long, BLAST may crop them. Change header names if necessary to prevent this.
@@ -51,6 +51,14 @@ Usage
     -   The timer states how long PIA.pl took to run.
 
 Please report any problems to r.cribdon@warwick.ac.uk.
+
+
+Outputs
+-------
+- [FASTA].header_out.intersects.txt: the main PIA output. Lists metrics for each read that passed the initial quality filter and its BLAST hits.
+- [FASTA].header_out.intersects.txt_Summary_Basic.txt: summarises any reads that passed every filter. Reads are grouped by taxon for easy interpretation.
+- [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes any BLAST hits that could not be matched to the names file.
+- timer_[FASTA].txt: brief log written by PIA.pl, if using. Times the run.
 
 
 Known issues

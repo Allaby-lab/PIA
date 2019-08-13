@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.4, 2019-08-09 ###############
+############## Version 4.4, 2019-08-13 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -582,16 +582,25 @@ sub PIA {
                     my @clean_hit_name = split(',', $clean_hit_name); # Remove anything after a comma. Sometimes BLAST hits go like "Sphingobium cloacae DNA, complete genome, strain: JCM...", but only two names in the names file (and they're synonyms) contain ", strain", so what comes after a comma is overwhelmingly useless.
                     $clean_hit_name = $clean_hit_name[0];
                 }
-                if (index ($clean_hit_name, 'virus') != -1) { # If $hit contains 'virus',
+                if (index ($clean_hit_name, 'virus') != -1) { # If $hit contains 'virus',      # TO DO: is this really wise?
                     my @clean_hit_name = split('virus', $clean_hit_name); # Remove anything after "virus". The species name of the virus is like "Ovine lentivirus" or "Influenza A virus". Any detail beyond that is classed in the nodes file not as subspecies etc., but as "no rank", making it useless to the PIA. So don't worry about matching more specifically than species.
                     $clean_hit_name = $clean_hit_name[0] . 'virus'; # Keep the pre-'virus' part but add 'virus' back on (split removed it).
                 }
                 my @clean_hit_name = split(' ', $clean_hit_name); # Split into words.
-                if ($clean_hit_name[0] eq "PREDICTED:") { # Remove the word "PREDICTED:" from the start of the hit. We don't care if it's predicted or not.
+                if ($clean_hit_name[0] eq 'UNVERIFIED:' or $clean_hit_name[0] eq 'PREDICTED:') { # Remove the words "UNVERIFIED:" and "PREDICTED:" from the start of the hit. We don't care.
+                    shift @clean_hit_name;
+                }
+                if ($clean_hit_name[0] eq 'UNVERIFIED:' or $clean_hit_name[0] eq 'PREDICTED:') { # I'm not assuming which order they come in, so check twice.
+                    shift @clean_hit_name;
+                }
+                if ($clean_hit_name[0] eq 'TPA:' or $clean_hit_name[0] eq 'TPA_asm:') { # "Third party annotation" sequences. We don't care.
                     shift @clean_hit_name;
                 }
                 if ($clean_hit_name[0] eq 'Uncultured') { # If the description starts with "Uncultured", change to "uncultured". The names file always has it lower-case.
                     $clean_hit_name[0] = 'uncultured';
+                }
+                if ($clean_hit_name[0] eq 'Unidentified') { # Similarly, de-capitalise "Unidentified".
+                    $clean_hit_name[0] = 'unidentified';
                 }
                 $clean_hit_name = join (' ', @clean_hit_name);
                 
@@ -733,21 +742,28 @@ sub PIA {
                     }
                 } # End of NAMELOOP.
                 
-                if ($found == 0) { # There are BLAST hit names that don't follow the formula. In here are some exceptions that I've come across. There may be a more efficient way to do this.
+                if ($found == 0) { # There are BLAST hit names that don't follow the formula. In here are some exceptions that I've come across. There may be a more efficient way to do this. TO DO: hash pairing string with ID? But instead of lookup, =~ start of $clean_hit_name. A hash is just easier to store things in.
+                    # Note that I'm assuming BLAST hits starting with "X.species" belong to that species, whereas hits starting with "Human " or "Wheat " may belong to the named organism or may be from, for example, "Human flu virus".
                     if ( (index ($clean_hit_name, 'Human DNA sequence') != -1) || (index ($clean_hit_name, 'H.sapiens') != -1 ) ) { # If the name contains either of these exact strings specifying human, give it human ID.
                         $current_hit_ID = '9606';
                         $found = 1; # Mark it as found.
-                    } elsif (index ($clean_hit_name, 'C.sativus') != -1) { # Cucumis sativus and Crocus sativus are the two possible choices, but the BLAST hit I found is to Cucumis, and Cucumis is much better sequenced (including a genome).
-                        $current_hit_ID = '3659';
+                    } elsif (index ($clean_hit_name, 'A.halopraeferens') != -1) { # Azospirillum halopraeferens is the only possible match.
+                        $current_hit_ID = '34010';
                         $found = 1;
-                    } elsif (index ($clean_hit_name, 'Z.mays') != -1) { # Zea mays is the only possible match.
-                        $current_hit_ID = '4577';
+                    } elsif (index ($clean_hit_name, 'C.sativus') != -1) { # Could match Cucumis sativus, Crocus sativus or the synonym Cochliobolus sativus. Cochliobolus is pretty much absent from the database. Cucumis is much better represented than Crocus, but to be safe, assign to their lowest common taxon, Mesangiospermae.
+                        $current_hit_ID = '1437183';
+                        $found = 1;
+                    } elsif (index ($clean_hit_name, 'Pig DNA') != -1) { # Sus scrofa.
+                        $current_hit_ID = '9823';
+                        $found = 1;
+                    } elsif (index ($clean_hit_name, 'Rice 25S') != -1) { # A rice ribosomal gene.
+                        $current_hit_ID = '4530';
                         $found = 1;
                     } elsif (index ($clean_hit_name, 'S.lycopersicum') != -1) { # Solanum lycopersicum is the only possible match.
                         $current_hit_ID = '4081';
                         $found = 1;
-                    } elsif (index ($clean_hit_name, 'Rice 25S') != -1) { # The ribosomal gene.
-                        $current_hit_ID = '4530';
+                    } elsif (index ($clean_hit_name, 'Z.mays') != -1) { # Zea mays is the only possible match.
+                        $current_hit_ID = '4577';
                         $found = 1;
                     }
                 }
@@ -790,8 +806,8 @@ sub PIA {
 		}
 		# Calculate the taxonomic diversity score.
 		my $tax_diversity_score = ($tax_diversity/$cap) - (1/$cap); # Remember, $tax_diversity is the number of unique BLAST taxa and $cap defaults to 100.
-        print "\t\tTaxa diversity = $tax_diversity\tScore = $tax_diversity_score\n";
-        print $log_filehandle "\t\tTaxa diversity = $tax_diversity\tScore = $tax_diversity_score\n";
+        #print "\t\tTaxa diversity = $tax_diversity\tScore = $tax_diversity_score\n";
+        #print $log_filehandle "\t\tTaxa diversity = $tax_diversity\tScore = $tax_diversity_score\n";
 		
         # So, are the top and second BLAST taxa in the same genus? Family? The search down from each taxon stops at class in most cases. If they aren't at least in the same class, it's not a worthy intersection? To do: sounds a little arbitrary.
         my $intersect_ID = 0; my $intersect_rank = "none"; my $intersect_name = "none found"; my $tophit_ID = 0; my $tophit_route = 0; # Default the intersect values to null.
