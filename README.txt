@@ -55,10 +55,10 @@ Please report any problems to r.cribdon@warwick.ac.uk.
 
 Outputs
 -------
-- [FASTA].header_out.intersects.txt: the main PIA output. Lists metrics for each read that passed the initial quality filter and its BLAST hits.
-- [FASTA].header_out.intersects.txt_Summary_Basic.txt: summarises any reads that passed every filter. Reads are grouped by taxon for easy interpretation.
-- [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes any BLAST hits that could not be matched to the names file.
-- timer_[FASTA].txt: brief log written by PIA.pl, if using. Times the run.
+-   [FASTA].header_out.intersects.txt: the main PIA output. Lists metrics for each read that passed the initial quality filter and its BLAST hits.
+-   [FASTA].header_out.intersects.txt_Summary_Basic.txt: summarises any reads that passed every filter. Reads are grouped by taxon for easy interpretation.
+-   [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes any BLAST hits that could not be matched to the names file.
+-   timer_[FASTA].txt: brief log written by PIA.pl, if using. Times the run.
 
 
 Known issues
