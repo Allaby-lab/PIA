@@ -66,5 +66,5 @@ Known issues
 -   The extended summary function is untested.
 -   BLAST hits are assigned to taxa using names.dmp. If there are matches to synonymous taxa, such as Iris the angiosperm and Iris the mantid, the PIA will exclude matches that do not fall in the expected phylogenetic range and then choose the match with the highest rank. If multiple matches have the highest rank, it will choose between them randomly.
 -   BLAST hits that could not be found in names.dmp will be noted in the log file. These hits will still count towards the taxonomic diversity score, but cannot be used to generate an intersection. This may also cause reads to be unnecessarily discarded if it affects the top or second-best hit.
--   A few BLAST hits (often to human sequences) do not follow the normal naming convention. I am slowly improving the name search function to pick these up.
+-   A few BLAST hits do not follow the normal naming convention. I am slowly improving the name search function to pick these up.
 -   Also, more recent names.dmp files contain more names so may allow more matches, so results can change with names.dmp versions.
