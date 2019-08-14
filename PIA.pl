@@ -16,6 +16,7 @@
 # - Collapses hits in the final Summary_Basic.txt.
 # - Does not expect re-PIAing or re-BLASTing or whatnot.
 # - Converts the non-BLAST input file into a header file. This allows it to accept FASTAs as well as ready-made header files.
+# - Should be able to run simultanously on multiple FASTAs in the same directory.
 
 	use strict;
 	use warnings;
@@ -37,10 +38,8 @@
 # - Check arguments and inputs.
 # - Generate a command file that will run PIA_inner.pl on x threads.
 # - Collate the x sets of output.
-# - Collate Summary_Basic.txt.
+# - Collapse the Summary_Basic.txts.
 
-# To do:
-# - Accept IDs in the intersects file and export them in summary basics. Account for them while collating.
 
 ######################################################										#####################
 ########### Check arguments and Input Data ###########										###### Modules ######
@@ -170,7 +169,7 @@ my $shellscript = 'shellscript_' . $header_filename . '.txt';
 unless(open FILE, '>'."$shellscript") { die "\nUnable to create $shellscript\n"; } # If the $shellscript file can't be created, die with an error.
 
 foreach my $file (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.
-		print FILE "perl PIA_inner.pl -f $file -b $blastfile -p $expected_phylogenetic_range -n $nodesfile -N $namesfile &\n";
+		print FILE "perl PIA_inner.pl -f $file -b $blastfile -c $cap -C $min_coverage_perc -n $nodesfile -N $namesfile -p $expected_phylogenetic_range &\n";
 } # So, if we run these commands simultaneously, we'll be processing each of the split header files simultaneously, and that's threading.
 # The fact that the command ends in "&" means that the command is told to run in the background, so new commands can be started on top. The commands should run alongside each other.
 
