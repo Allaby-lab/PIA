@@ -109,20 +109,25 @@
 	if ($expected_phylogenetic_range_opt) {$expected_phylogenetic_range = $expected_phylogenetic_range_opt;}
 
 
-# Make copies of the DBM index files for this run of PIA_inner.pl to use
-#-----------------------------------------------------------------------
-# TO DO: replace with file locking eventually
-my $namesfileDBMnames = 'Reference_files/names.dmp_names.dbm' . "_$tophitfile";
-system ("cp Reference_files/names.dmp_names.dbm $namesfileDBMnames");
-my %namesfileDBMnames = (); # And initialise a hash to hold the DBM later.
-
-my $namesfileDBMids = 'Reference_files/names.dmp_IDs.dbm' . "_$tophitfile";
-system ("cp Reference_files/names.dmp_IDs.dbm $namesfileDBMids");
-my %namesfileDBMids = ();
-
-my $nodesfileDBM = 'Reference_files/nodes.dmp.dbm' . "_$tophitfile";
-system ("cp Reference_files/nodes.dmp.dbm $nodesfileDBM");
-my %nodesfileDBM = ();
+######################################################
+######### Make copies of the DBM index files #########
+######################################################
+    # TO DO: replace with file locking eventually
+    my $nodesfileDBM = 'Reference_files/nodes.dmp.dbm' . "_$tophitfile";
+    system ("cp Reference_files/nodes.dmp.dbm $nodesfileDBM");
+    my %nodesfileDBM = ();
+    
+    my $namesfileDBMnames = 'Reference_files/names.dmp_names.dbm' . "_$tophitfile";
+    system ("cp Reference_files/names.dmp_names.dbm $namesfileDBMnames");
+    my %namesfileDBMnames = (); # And initialise a hash to hold the DBM later.
+    
+    my $namesfileDBMids = 'Reference_files/names.dmp_IDs.dbm' . "_$tophitfile";
+    system ("cp Reference_files/names.dmp_IDs.dbm $namesfileDBMids");
+    my %namesfileDBMids = ();
+    
+    my $abbreviationsDBM = 'Reference_files/Species_abbreviations.txt.dbm' . "_$tophitfile  ";
+    system ("cp Reference_files/Species_abbreviations.txt.dbm $abbreviationsDBM");
+    my %abbreviationsDBM = ();
 
 
 
@@ -181,6 +186,7 @@ my %nodesfileDBM = ();
     unlink $namesfileDBMnames;
     unlink $namesfileDBMids;
     unlink $nodesfileDBM;
+    unlink $abbreviationsDBM;
 	
 # Finish the log and move it into the output directory.
     print $log_filehandle "****This run of PIA_inner.pl is finished.****\n\n\n\n";
@@ -522,24 +528,15 @@ sub PIA {
                 my @current_hit = split(' ', $current_hit); # Split the name into words again.
                 
                 # A small number of hits start with gramatically-incorrect species abbreviations. These are those I've found. Check for them before starting the huge hash lookups.
-                my %common_species_abbreviations = (
-                        'A.halopraeferens' => 34010, # Azospirillum halopraeferens
-                        'A.thaliana' => 34010, # Arabidopsis thaliana
-                        'E.coli' => 562, # Could match Escherchia coli or Entamoeba coli, but if the names file can assign "E. coli" exclusively to Escherichia, so can I.
-                        'H.sapiens' => 9606, # Homo sapiens
-                        'C.sativus' => 3659, # Could match Cucumis sativus, Crocus sativus or the synonym Cochliobolus sativus. As of August 2019, all 18 BLAST hits to "C.sativus" are to Cucumis sativus. Also, it's the best represented, and I assume the lazy scientist who didn't put the full organism name meant the obvious one.
-                        'M.mulatta' => 9544, # Macaca mulatta
-                        'N.leucogenys' => 61853, # Nomascus leucogenys
-                        'O.sativa' => 4530, # Could match Oryza sativa or the synonym Onobrychis sativa, but there are no nucleotide records under Onobrychis sativa, so there shouldn't be any BLAST hits to it.
-                        'P.littoralis' => 2885, # Could match several organisms, but as of August 2019, the only 9 NCBI sequences for 'P.littoralis' are to Pylaiella littoralis.
-                        'P.troglodytes' => 9598, # Could match Pan trogolodytes or Procambarus troglodytes, but the latter only has five BLAST entries, all under Procambrus. Also, I assume the lazy scientist who didn't put the full organism name meant the obvious one.
-                        'S.lycopersicum' => 4081, # Solanum lycopersicum
-                        'S.warneri' => 1292, # Staphylococcus warneri
-                        'Z.mays'=> 4577, # Zea mays
-                );
-                if (exists $common_species_abbreviations{$current_hit[0]}) {
-                            $current_hit_ID = $common_species_abbreviations{$current_hit[0]};
-                            $found = 1; # Match? Mark as found.
+                if ($found == 0) { # A small number of hits start with gramatically-incorrect species abbreviations. These are those I've found. Check for them before starting the huge hash lookups.
+                    tie (%abbreviationsDBM, "DB_File", $abbreviationsDBM, O_RDONLY, 0666, $DB_BTREE) or die "Can't open $abbreviationsDBM: $!\n";
+                    
+                    if (exists $abbreviationsDBM{$current_hit[0]}) {
+                                $current_hit_ID = $abbreviationsDBM{$current_hit[0]};
+                                $found = 1;
+                                print "\t\tFound '$original_hit' in the abbreviations DBM and assigned to $current_hit_ID\n";
+                    }
+                    untie %abbreviationsDBM;
                 }
                 
                 

@@ -6,7 +6,7 @@
 ####### Creates DBM index files for later use ########
 ############## Becky Cribdon, UoW 2019################
 ######################################################
-############## Version 1.0, 2019-08-22 ###############
+############## Version 4.6, 2019-08-22 ###############
 ######################################################
 
 	use strict;
@@ -26,29 +26,36 @@
 # - Makes an index of the nodes file where keys are IDs and values are parent nodes and taxonomic ranks.
 
 my %options=();
-getopts('n:N:', \%options);
+getopts('n:N:a"', \%options);
     
-##### Locate nodes.dmp and names.dmp files #####
-	# If nodes.dmp and names.dmp aren't in their default location (Reference_files/), use -n and -N to specify where they are.	
-	my $nodesfile="Reference_files/nodes.dmp";
+##### Locate reference files #####
+	# If they aren't in their default location (Reference_files/), use the options to specify where they are.	
+	my $nodes_filename = 'Reference_files/nodes.dmp';
 	if ($options{n}){
-		$nodesfile=($options{n});
+		$nodes_filename = ($options{n});
 	}
-	my $namesfile="Reference_files/names.dmp";   
+	
+    my $names_filename = 'Reference_files/names.dmp';   
 	if ($options{N}){
-		$namesfile=($options{N});
+		$names_filename = ($options{N});
+	}
+
+    my $abbreviations_filename = 'Reference_files/Species_abbreviations.txt';
+    if ($options{a}){
+		$abbreviations_filename = ($options{a});
 	}
 
 
 ##############################################		
 ########### Set up DBM index files ###########
 ##############################################
+
 print "\n\n****Setting up DBM index files****\n";
 
 
 # Nodes index where keys are IDs
 #-------------------------------
-my $nodesfileDBM = $nodesfile . '.dbm';
+my $nodesfileDBM = $nodes_filename . '.dbm';
 
 if (-e $nodesfileDBM) {
     print "$nodesfileDBM already exists. Overwriting.\n";
@@ -59,7 +66,7 @@ my %nodesfileDBM = (); # Keys are taxonomic IDs and values are parent nodes and 
 tie (%nodesfileDBM, "DB_File", $nodesfileDBM, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $nodesfileDBM.\n$!\n";
 
 # Now populate the hash:
-open (my $nodes_filehandle, $nodesfile) or die "Could not open $nodesfile.\n$!\n";
+open (my $nodes_filehandle, $nodes_filename) or die "Could not open $nodes_filename.\n$!\n";
 while (1) { # Run this loop until "last" is called.
         my $line = <$nodes_filehandle>; # Read the next line from the nodes file.
         if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
@@ -80,7 +87,7 @@ untie %nodesfileDBM;
 # Names index where keys are names
 #---------------------------------
 # This will be used to look up the taxonomic IDs of BLAST hits.
-my $namesfileDBMnames = $namesfile . '_names.dbm'; # Including $header_filename in the DBM filename ensures that every thread makes its own index file, preventing read/write conflict. Otherwise I'd have to get into file locks and oh my goodness not now.
+my $namesfileDBMnames = $names_filename . '_names.dbm'; # Including $header_filename in the DBM filename ensures that every thread makes its own index file, preventing read/write conflict. Otherwise I'd have to get into file locks and oh my goodness not now.
         
 if (-e $namesfileDBMnames) {
     print "$namesfileDBMnames already exists. Overwriting.\n";
@@ -91,7 +98,7 @@ my %namesfileDBMnames = (); # Keys are names (scientific and not, because BLAST 
 tie (%namesfileDBMnames, "DB_File", $namesfileDBMnames, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $namesfileDBMnames.\n$!\n"; # Open the DBM file (in read-write mode; O_RDWR). If it doesn't exist, create one (O_CREAT). Note that these options use the Fcntl module.
 
 # Now populate the hash:
-open (my $names_filehandle, $namesfile) or die "Could not open $namesfile.\n$!\n";
+open (my $names_filehandle, $names_filename) or die "Could not open $names_filename.\n$!\n";
 while (1) { # Run this loop until "last" is called.
         my $line = <$names_filehandle>; # Read the next line from the names file.
         if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
@@ -131,7 +138,7 @@ untie %namesfileDBMnames;
 # Names index where keys are IDs
 #-------------------------------
 # This will be used to look up the scientific names of taxa using their IDs.
-my $namesfileDBMids = $namesfile . '_IDs.dbm';
+my $namesfileDBMids = $names_filename . '_IDs.dbm';
 
 if (-e $namesfileDBMids) {
     print "$namesfileDBMids already exists. Overwriting.\n";
@@ -142,7 +149,7 @@ my %namesfileDBMids = (); # Keys are taxonomic IDs and values are scientific nam
 tie (%namesfileDBMids, "DB_File", $namesfileDBMids, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $namesfileDBMids.\n$!\n";
 
 # Now populate the hash:
-open ($names_filehandle, $namesfile) or die "Could not open $namesfile.\n$!\n";
+open ($names_filehandle, $names_filename) or die "Could not open $names_filename.\n$!\n";
 while (1) { # Run this loop until "last" is called.
         my $line = <$names_filehandle>; # Read the next line from the names file.
         if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
@@ -159,6 +166,32 @@ while (1) { # Run this loop until "last" is called.
 }
 close $names_filehandle;
 untie %namesfileDBMids;
+
+
+# Species abbreviations index
+#----------------------------
+# BLAST hits will be checked against this list and assigned the corresponding ID if they match. Species abbreviations are not usually picked up by the normal names search in PIA_inner.pl.
+my $abbreviationsDBM = $abbreviations_filename . '.dbm';
+
+if (-e $abbreviationsDBM) {
+    print "$abbreviationsDBM already exists. Overwriting.\n";
+    unlink $abbreviationsDBM;
+}
+   
+my %abbreviationsDBM = (); # Keys are species abbreviations and values are taxonomic IDs.
+tie (%abbreviationsDBM, "DB_File", $abbreviationsDBM, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $abbreviationsDBM.\n$!\n";
+
+# Now populate the hash:
+open (my $abbreviations_filehandle, $abbreviations_filename) or die "Could not open $abbreviations_filename.\n$!\n";
+while (1) { # Run this loop until "last" is called.
+        my $line = <$abbreviations_filehandle>; # Read the next line from the names file.
+        if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
+
+        my @line = split("\t", $line); # Split the line on tabs.
+        $abbreviationsDBM{$line[0]} = $line[1]; # Save the abbreviation as the key and the ID as the value. The final field is a comment.
+}
+close $abbreviations_filehandle;
+untie %abbreviationsDBM;
 
 
 print "Finished indexing.\n\n";  

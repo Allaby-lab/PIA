@@ -1,0 +1,33 @@
+A.halopraeferens	34010	Azospirillum halopraeferens
+A.thaliana	34010	Arabidopsis thaliana
+B.juncea	3707	Brassica juncea	
+B.napus	3708	Brassica napus
+B.nigra	3710	Brassica nigra
+B. nigra	3710	Brassica nigra - note the space
+B.oleracea	3712	Brassica oleraceae
+B.campestris	145471	Brassica rapa subsp. oleifera
+E.coli	562	Could match Escherchia coli or Entamoeba coli, but if the names file can assign "E. coli" exclusively to Escherichia, so can I.
+G.max	3847	Glycine max
+H.brachyanterum	37672	Hordeum brachyantherum subsp. californicum
+H.euclaston	58927	Hordeum euclaston
+H.jubatum	4517	Hordeum jubatum
+H.muticum	58928	 Hordeum muticum
+H.patagonicum	58929	Could match several, but as of August 2019, the only six NCBI sequences are to Hordeum patagonicum.
+H.sapiens	9606	Homo sapiens
+H.spontaneum	77009	Hordeum spontaneum
+H.vulgare	4513	Could match Hordeum vulgare, Hyphobacterium vulgare or Hyphomicrobium vulgare, but as of August 2019, all NCBI sequences are to Hordeum. And it matches the trend of Hordeum sequences being lazily named.
+C.sativus	3659	Could match Cucumis sativus, Crocus sativus or the synonym Cochliobolus sativus. As of August 2019, all 18 NCBI sequences are to Cucumis sativus. Also, its the best represented, and I assume the lazy scientist who didnt put the full organism name meant the obvious one.
+L.carnosum	1252	Could match several, but as of August 2019, the only three NCBI sequences are to Leuconostoc carnosum.
+L.dextranicum	33966	Leuconostoc mesenteroides subsp. dextranicum
+L.mesenteroides	1245	Could match several, but as of August 2019, the only three NCBI sequences are to Leuconostoc mesenteroides.
+M.mulatta	9544	Macaca mulatta
+M.truncatula	3880	Medicago truncatula
+N.leucogenys	61853	Nomascus leucogenys
+O.berteriana	3950	A synonym of Oenothera berteroana - note the spelling difference.
+O.sativa	4530	Could match Oryza sativa or the synonym Onobrychis sativa, but there are no nucleotide records under Onobrychis sativa, so there shouldnt be any BLAST hits to it.
+P.littoralis	2885	Could match several organisms, but as of August 2019, the only 9 NCBI sequences for P.littoralis are to Pylaiella littoralis.
+P.troglodytes	9598	Could match Pan trogolodytes or Procambarus troglodytes, but the latter only has five BLAST entries, all under Procambrus. Also, I assume the lazy scientist who didnt put the full organism name meant the obvious one.
+S.cereale	4550	Secale cereale
+S.lycopersicum	4081	Solanum lycopersicum
+S.warneri	1292	Staphylococcus warneri
+Z.mays	4577	Zea mays
