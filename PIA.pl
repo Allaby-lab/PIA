@@ -6,7 +6,7 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 4.4, 2019-08-13 ###############
+############## Version 4.7, 2019-08-22 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2018
@@ -18,11 +18,13 @@
 # - Converts the non-BLAST input file into a header file. This allows it to accept FASTAs as well as ready-made header files.
 # - Should be able to run simultanously on multiple FASTAs in the same directory.
 
+# Edits for indexing re-vamp August 2019:
+# - Removed names and nodes input options. Also removed from shellscript.
+
 	use strict;
 	use warnings;
 	use lib './Modules'; # Add the /Modules directory to @INC: the list of places Perl will look for modules. 
 	use FileChecks; # A bespoke module in /Modules.
-	use TreeOfLife; # A bespoke module in /Modules.
 	use Getopt::Std;
 	use File::Find;
 	use Data::Dumper qw(Dumper);
@@ -47,7 +49,7 @@
 
 ##### Get arguments from command line #####
 	my %options=();
-	getopts('f:b:c:C:ehn:N:p:t:', \%options); 														#Getopt::Std
+	getopts('f:b:c:C:ehp:t:', \%options); 														#Getopt::Std
     
 	# If other text found on command line, do:
 	print "Other things found on the command line:\n" if $ARGV[0];
@@ -91,17 +93,6 @@
 		FileChecks::process_help($helpfile);														#FileChecks.pm	
 	}
 
-##### Locate nodes.dmp and names.dmp files #####
-	# If nodes.dmp and names.dmp aren't in their default location (Reference_files/), use -n and -N to specify where they are.	
-	my $nodesfile="Reference_files/nodes.dmp";
-	if ($options{n}){
-		$nodesfile=($options{n});
-	}
-	my $namesfile="Reference_files/names.dmp";   
-	if ($options{N}){
-		$namesfile=($options{N});
-	}
-
 ##### See if expected phylogenetic range input #####	
 	# Ensure that a number has been given as an argument. -p flag
 	my $expected_phylogenetic_range_opt = ($options{p});
@@ -122,7 +113,7 @@ open( my $timer_filehandle, '>', $timer_filename) or die "Cannot open $timer_fil
 use IO::Handle; # Enable autoflush.
 $timer_filehandle -> autoflush(1); # Set autoflush to 1 for the log filehandle. This means that Perl won't buffer its output to the log, so the log should be updated in real time.
 my $timestamp = localtime();
-print $timer_filehandle "Input FASTA: $fasta_filename\nInput BLAST: $blastfile\n\nPIA started at $timestamp\n\n";
+print $timer_filehandle "Input FASTA: $fasta_filename\nInput BLAST: $blastfile\nNumber of threads: $thread\n\nPIA started at $timestamp\n\n";
 
 
 # Generate a header file
@@ -169,7 +160,7 @@ my $shellscript = 'shellscript_' . $header_filename . '.txt';
 unless(open FILE, '>'."$shellscript") { die "\nUnable to create $shellscript\n"; } # If the $shellscript file can't be created, die with an error.
 
 foreach my $file (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.
-		print FILE "perl PIA_inner.pl -f $file -b $blastfile -c $cap -C $min_coverage_perc -n $nodesfile -N $namesfile -p $expected_phylogenetic_range &\n";
+		print FILE "perl PIA_inner.pl -f $file -b $blastfile -c $cap -C $min_coverage_perc -p $expected_phylogenetic_range &\n";
 } # So, if we run these commands simultaneously, we'll be processing each of the split header files simultaneously, and that's threading.
 # The fact that the command ends in "&" means that the command is told to run in the background, so new commands can be started on top. The commands should run alongside each other.
 
