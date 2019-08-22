@@ -24,12 +24,13 @@ Files and directories
 ---------------------
 Modules/
     FileChecks.pm
-    TreeOfLife.pm
 Reference_files/
     names.dmp
     nodes.dmp
+    Species_abbreviations.txt
 Helpfile_PIA.txt
 PIA.pl
+PIA_index_maker.pl
 PIA_inner.pl
 [input FASTA]
 [input BLAST]
