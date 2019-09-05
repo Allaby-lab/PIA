@@ -147,7 +147,7 @@ if ($megan_filename) { # If there is a MEGAN file to be processed.
     }
     
     foreach my $remaining_ID (keys %data_by_ID_partial) {
-        print "\t\tWarning: failed to find $remaining_ID in fullnamelineage.dmp.\n";
+        print "\t\tWarning: failed to find $remaining_ID in fullnamelineage.dmp. Defaulting name and taxonomy to 'none found'.\n";
         $data_by_ID{$remaining_ID} =  "none found\tnone found\t" . $data_by_ID_partial{$remaining_ID}; # The full taxonomy and name are 'none found'.
     }
     
@@ -200,7 +200,7 @@ foreach my $summary_basic_filename (@summary_basic_filenames) {
     my $preceding_empty_columns = "\t0" x $number_of_sample_columns;
     
     if (exists $incoming_by_ID{131567}) { # If one of the taxa is ID 131567, it's "cellular organisms" and doesn't have a full taxonomy. Fill its information for $data_by_ID here to avoid formatting problems.
-        $data_by_ID{131567} = "cellular organisms\tcellular organisms\t" . $preceding_empty_columns . "\t" . $incoming_by_ID{$131567};
+        $data_by_ID{131567} = "cellular organisms\tcellular organisms\t" . $preceding_empty_columns . "\t" . $incoming_by_ID{131567};
         delete $incoming_by_ID{131567};
     }
         
@@ -241,8 +241,6 @@ foreach my $summary_basic_filename (@summary_basic_filenames) {
 open( my $output_filehandle, '>', $output_filename) or die "Cannot open $output_filename for writing.\n$!\n";
 
 print $output_filehandle "$header_master\n"; # Print the header first.
-
-print "Just before export:\n"; print Dumper \%data_by_ID; print "\n\n"; # Correct
 
 foreach my $ID (keys %data_by_ID) {
     my @entry = split ("\t", $data_by_ID{$ID});
