@@ -111,8 +111,8 @@ my $timestamp_start = localtime();
 #-----------------------
 # This will contain every header from the FASTA file plus the corresponding sequence length.
 my $header_filename = $fasta_filename . '.header';
-open (my $header_filehandle, '>', $header_filename) or die "Cannot open $header_filename for writing.\n$!\n";
-open (my $fasta_filehandle, $fasta_filename) or die "Cannot open $fasta_filename.\n$!\n";
+open (my $header_filehandle, '>', $header_filename) or die "Cannot open $header_filename for writing: $!\n";
+open (my $fasta_filehandle, $fasta_filename) or die "Cannot open FASTA $fasta_filename: $!\n";
 
 $/ = '>'; # Set the input record separator to '>', the first character of a header line and of a FASTA record.
 while (1) { # Run this loop until "last" is called.
@@ -239,7 +239,7 @@ open ($S_filehandle,'>', $S) or die "Could not open summary basic file $S.\n$!\n
 
 # Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
 my $timestamp_end = localtime();
-print $S_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# ID\tName\tHit count\n";
+print $S_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# ID\tName\tReads\n";
 
 foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any summary basic, this hash will be empty. But that shouldn't throw an error.
 	print $S_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
