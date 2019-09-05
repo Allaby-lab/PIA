@@ -141,7 +141,7 @@ if ($megan_filename) { # If there is a MEGAN file to be processed.
             $line[2] =~ s/^\s+|\s+$//g; # $line[2] is the taxonomy. Remove any leading or trailing whitespace.
             my $full_taxonomy = $line[2] . ' ' . $line[1]; # Add scientific name onto the end of the taxonomy to get the full taxonomy. Apart from this, the taxonomy is still in NCBI format.
             
-            $data_by_ID{$ID} = $full_taxonomy . "\t" . $line[1] . "\t" . $data_by_ID_partial{$ID}; # Save the new information in %data_by_ID.
+            $data_by_ID{$ID} = "$full_taxonomy\t$line[1]\t" . $data_by_ID_partial{$ID}; # Save the new information in %data_by_ID.
             delete $data_by_ID_partial{$ID};
         }
     }
@@ -200,7 +200,7 @@ foreach my $summary_basic_filename (@summary_basic_filenames) {
     my $preceding_empty_columns = "\t0" x $number_of_sample_columns;
     
     if (exists $incoming_by_ID{131567}) { # If one of the taxa is ID 131567, it's "cellular organisms" and doesn't have a full taxonomy. Fill its information for $data_by_ID here to avoid formatting problems.
-        $data_by_ID{131567} = "cellular organisms\tcellular organisms\t" . $preceding_empty_columns . "\t" . $incoming_by_ID{131567};
+        $data_by_ID{131567} = "cellular organisms\tcellular organisms$preceding_empty_columns\t" . $incoming_by_ID{131567};
         delete $incoming_by_ID{131567};
     }
         
@@ -217,15 +217,15 @@ foreach my $summary_basic_filename (@summary_basic_filenames) {
                  
             my $full_taxonomy = $line[2] . ' ' . $line[1]; # Add scientific name onto the end of the taxonomy to get the full taxonomy. Apart from this, the taxonomy is still in NCBI format.
             
-            $data_by_ID{$ID} = $full_taxonomy . "\t" . $line[1] . $preceding_empty_columns . "\t" . $incoming_by_ID{$ID}; # Save the information from here and %incoming_by_ID in %data_by_ID.
+            $data_by_ID{$ID} = "$full_taxonomy\t$line[1]$preceding_empty_columns\t" . $incoming_by_ID{$ID}; # Save the information from here and %incoming_by_ID in %data_by_ID.
             delete $incoming_by_ID{$ID};
         }
     }
     close $full_taxonomy_filehandle;
     
     foreach my $remaining_ID (keys %incoming_by_ID) {
-        print "\t\tWarning: failed to find $remaining_ID in fullnamelineage.dmp.\n";
-        $data_by_ID{$remaining_ID} = "none found\tnone found\t" . $preceding_empty_columns . "\t" . $incoming_by_ID{$remaining_ID}; # The full taxonomy and name are 'none found'.
+        print "\t\tWarning: failed to find $remaining_ID in fullnamelineage.dmp. Defaulting name and taxonomy to 'none found'.\n";
+        $data_by_ID{$remaining_ID} = "none found\tnone found$preceding_empty_columns\t" . $incoming_by_ID{$remaining_ID}; # The full taxonomy and name are 'none found'.
     }
 
 
@@ -245,7 +245,7 @@ print $output_filehandle "$header_master\n"; # Print the header first.
 foreach my $ID (keys %data_by_ID) {
     my @entry = split ("\t", $data_by_ID{$ID});
     my $sample_columns = join ("\t", @entry[2..$#entry]); # Extract the sample columns - that's column 3 onwards.
-    print $output_filehandle "$entry[0]\t" . "$entry[1]\t" . "$ID\t" . $sample_columns .  "\n"; # Print the full taxonomy, name, ID, then sample columns.
+    print $output_filehandle "$entry[0]\t$entry[1]\t$ID\t$sample_columns\n"; # Print the full taxonomy, name, ID, then sample columns.
 }
 
 if ($output_filename eq 'Collated.txt') {
