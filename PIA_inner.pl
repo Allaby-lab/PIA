@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.8, 2019-09-04 ###############
+############## Version 4.8, 2019-09-10 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -21,9 +21,6 @@
 # - Intersections are taken wherever possible. No stopping at class.
 # - Takes BLAST input not in standard format, but as "-outfmt 6 std staxid".
 
-# Issues:
-# - Re-name "taxa diversity" and "taxa diversity score" in the intersects file to "taxon" or "taxonomic". But I'll have to update the FASTA making script too (so it looks for " diversity score" or something).
-# - Anything else labelled "to do".
 # Please report any problems to r.cribdon@warwick.ac.uk.
 
 # This usually runs inside PIA.pl. To run independently, PIA.pl must already have made a header file containing the name and length of every sequence in the FASTA. 
@@ -331,7 +328,7 @@ sub PIA {
 
                 # Calculate the taxonomic diversity score
                 #----------------------------------------
-                my $number_of_hit_taxa = keys %hit_taxa; # Note that this is based on the number of taxa in the BLAST hits, not the number of hits after filtering by score.
+                my $number_of_hit_taxa = keys %hit_taxa; # Note that this is based on the number of taxa in the BLAST hits, not the number of hits after filtering by E value.
                 my $tax_diversity_score = ($number_of_hit_taxa/$cap) - (1/$cap); # Remember, $cap defaults to 100.
                 
                 my $contrastinghit_ID = 0; my $contrastinghit_name = 'none found'; # contrastinghit is second BLAST hit: number 1 if you're counting from 0. Default the values to null.
@@ -409,7 +406,7 @@ sub PIA {
                 if ($skip == 0) { # If $skip is 1, this will print mostly null values for a header that should have been skipped. Don't want that.
                     open (my $intersects_filehandle, ">>".$corename."/"."$corename".".intersects.txt") or die "Cannot write intersects file ".$corename.".intersects.txt: $!\n"; # Open intersect file for appending.
             
-                    print $intersects_filehandle "Query: $current_header, first hit: $tophit_name ($tophit_ID), expect: $tophit_e_value, identities: $tophit_identities, next hit: $contrastinghit_name ($contrastinghit_ID), last hit up to cap: $bottomhit_name ($bottomhit_ID), phylogenetic range of hits up to cap: $bottom_intersect_name ($bottom_intersect_ID), number of hits: $number_of_hits, taxa diversity: $number_of_hit_taxa, taxonomic diversity score: $tax_diversity_score, classification intersect: $intersect_name ($intersect_ID)\n";
+                    print $intersects_filehandle "Query: $current_header, first hit: $tophit_name ($tophit_ID), expect: $tophit_e_value, identities: $tophit_identities, next hit: $contrastinghit_name ($contrastinghit_ID), last hit up to cap: $bottomhit_name ($bottomhit_ID), phylogenetic range of hits up to cap: $bottom_intersect_name ($bottom_intersect_ID), number of identifiable hits: $number_of_hits, taxonomic diversity: $number_of_hit_taxa, taxonomic diversity score: $tax_diversity_score, classification intersect: $intersect_name ($intersect_ID)\n";
                 }
             }
             
@@ -459,7 +456,8 @@ sub PIA {
         
         my $ID = $line[12]; # Note the taxonomic ID of the organism this hit comes from.
         chomp $ID;
-        if (exists $hit_taxa{$ID}) { next BLASTLINE; } # If we already have a hit from this organism, move on to the next hit.
+
+        if (exists $hit_taxa{$ID} or $ID eq 'N/A') { next BLASTLINE; } # If we already have a hit from this organism, or if the ID is 'N/A', move on to the next hit.
         $hit_taxa{$ID} = undef; # Otherwise, note the ID in %hit_taxa.
         
         my $e_value = $line[10]; # Note the E value. Fortunately, Perl recognises that something like 3.14e-10 is a number.
@@ -499,7 +497,7 @@ sub retrieve_taxonomic_structure {
 
     my $route = undef; # Default the route to undef.
     
-    unless ($query_ID == 0) {
+    unless ($query_ID == 0) { # I've had it before where $query_ID is "N/A".
         my $exit = 0; # When to exit the do loop below.
         my $next_level_ID; # The ID of the parent node.
         my @route = (); # @route is a list of tab-separated taxonomic IDs moving down from the current node.
@@ -535,6 +533,12 @@ sub retrieve_taxonomic_structure {
 sub simple_summary {
 #### Create simple summary of output. The intersects file is more informative, but this is what most people will take as the output.
 	my ($intersects_filename, $min_taxdiv_score) = @_;
+    
+    unless (-e $intersects_filename) { # If there was no intersects file:
+        print "No reads passed the coverage check. No intersects file produced.\n";
+        print $log_filehandle "No reads passed the coverage check. No intersects file produced.\n";
+        return 'none';
+    }
     
 	open (my $intersects_filehandle, $intersects_filename) or die "Cannot open intersects file for generating summary basic: $!\n";			
 	my %intersects = (); # Keys are intersect names and IDs in the format "name (ID)". Values are the number of times that name (ID) occurs.

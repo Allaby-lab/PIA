@@ -6,7 +6,7 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 4.8, 2019-09-04 ###############
+############## Version 4.8, 2019-09-10 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2018
@@ -31,7 +31,7 @@
 # - Check arguments and inputs.
 # - Generate a command file that will run PIA_inner.pl on x threads.
 # - Collate the x sets of output.
-# - Collapse the Summary_Basic.txts.
+# - Collapse the Summary_Basic.txts (if there are any).
 
 
 ######################################################										#####################
@@ -212,37 +212,41 @@ foreach my $data_file (@logs) {
 
 # Collapse duplicates in the summary basic file
 #----------------------------------------------
-open (my $S_filehandle, $S) or die "Could not open summary basic file $S for collapsing.\n$!\n"; # Read in the uncollapsed file.
-my %taxa_and_hits = ();
-foreach my $line (readline($S_filehandle)) {
-    
-    if (index ($line, '#') != -1) {
-        next; # If the line contains a hash symbol, which indicates the header line, skip it.
-    }
-    chomp $line;
-	my @line = split("\t", $line);
-
-    my $ID_and_name = $line[0] . "\t" . $line[1]; # The first two columns are ID and name.
-	my $hit_count = $line[2]; # The final column is count.
-	if (exists $taxa_and_hits{$ID_and_name}) {
-		$taxa_and_hits{$ID_and_name} = $taxa_and_hits{$ID_and_name} + $hit_count;
-	} else {
-		$taxa_and_hits{$ID_and_name} = $hit_count;
-    }
-}
-close $S_filehandle;
-
-my @OI = split ('/', $OI); # Take the intersects file name. If $OI is a path, find the file name on the end.
-my $sample_filename = $OI[-1];
-
-open ($S_filehandle,'>', $S) or die "Could not open summary basic file $S.\n$!\n"; # Open the file again, this time to overwrite.
-
-# Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
-my $timestamp_end = localtime();
-print $S_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# ID\tName\tReads\n";
-
-foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any summary basic, this hash will be empty. But that shouldn't throw an error.
-	print $S_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
+if (-e $S) { # If there were actually any summary basics to start with.
+        open (my $S_filehandle, $S) or die "Could not open summary basic file $S for collapsing: $!\n"; # Read in the uncollapsed file.
+        my %taxa_and_hits = ();
+        foreach my $line (readline($S_filehandle)) {
+            
+            if (index ($line, '#') != -1) {
+                next; # If the line contains a hash symbol, which indicates the header line, skip it.
+            }
+            chomp $line;
+            my @line = split("\t", $line);
+        
+            my $ID_and_name = $line[0] . "\t" . $line[1]; # The first two columns are ID and name.
+            my $hit_count = $line[2]; # The final column is count.
+            if (exists $taxa_and_hits{$ID_and_name}) {
+                $taxa_and_hits{$ID_and_name} = $taxa_and_hits{$ID_and_name} + $hit_count;
+            } else {
+                $taxa_and_hits{$ID_and_name} = $hit_count;
+            }
+        }
+        close $S_filehandle;
+        
+        my @OI = split ('/', $OI); # Take the intersects file name. If $OI is a path, find the file name on the end.
+        my $sample_filename = $OI[-1];
+        
+        open ($S_filehandle,'>', $S) or die "Could not open summary basic file $S: $!\n"; # Open the file again, this time to overwrite.
+        
+        # Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
+        my $timestamp_end = localtime();
+        print $S_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# ID\tName\tReads\n";
+        
+        foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any summary basic, this hash will be empty. But that shouldn't throw an error.
+            print $S_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
+        }
+} else {
+    print "\nPIA finished, but no summary basic files found.\n\n";
 }
 
 
