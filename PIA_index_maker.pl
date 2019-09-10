@@ -57,10 +57,10 @@ if (-e $nodesfileDBM) {
 }
    
 my %nodesfileDBM = (); # Keys are taxonomic IDs and values are parent nodes and taxonomic ranks.
-tie (%nodesfileDBM, "DB_File", $nodesfileDBM, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $nodesfileDBM.\n$!\n";
+tie (%nodesfileDBM, "DB_File", $nodesfileDBM, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $nodesfileDBM: $!\n";
 
 # Now populate the hash:
-open (my $nodes_filehandle, $nodes_filename) or die "Could not open $nodes_filename.\n$!\n";
+open (my $nodes_filehandle, $nodes_filename) or die "Could not open $nodes_filename: $!\n";
 while (1) { # Run this loop until "last" is called.
         my $line = <$nodes_filehandle>; # Read the next line from the nodes file.
         if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
@@ -89,10 +89,10 @@ if (-e $namesfileDBM) {
 }
    
 my %namesfileDBM = (); # Keys are taxonomic IDs and values are scientific names.
-tie (%namesfileDBM, "DB_File", $namesfileDBM, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $namesfileDBM.\n$!\n";
+tie (%namesfileDBM, "DB_File", $namesfileDBM, O_RDWR|O_CREAT, 0666, $DB_BTREE) or die "Can't open $namesfileDBM: $!\n";
 
 # Now populate the hash:
-open (my $names_filehandle, $names_filename) or die "Could not open $names_filename.\n$!\n";
+open (my $names_filehandle, $names_filename) or die "Could not open $names_filename: $!\n";
 while (1) { # Run this loop until "last" is called.
         my $line = <$names_filehandle>; # Read the next line from the names file.
         if (! defined $line) { last }; # If there is no next line, exit the loop. You've processed the whole file.
