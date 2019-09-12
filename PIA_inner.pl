@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.8, 2019-09-10 ###############
+############## Version 4.9, 2019-09-12 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -34,7 +34,7 @@
 	use Getopt::Std;
     use DB_File;
     use Fcntl;
-	#use Data::Dumper qw(Dumper); # Only used for testing
+	use Data::Dumper qw(Dumper); # Only used for testing
     
 
 ######################################################										#####################
@@ -214,6 +214,7 @@ sub PIA {
     #   If a line is the first hit to a new header (the top hit),
     #       First, finish processing the hits from the last header.
     #           Collapse multiple hits with the same E value to their intersection. So, in the end there's just one hit per E value.
+    #           If a new "hits" is to an existing taxon, discard all but the hit with the highest E value.
     #           Calculate the taxonomic diversity score. This affects which reads make it to the summary basic.
     #           Find the intersection between the top and second-top hits. This is the taxon the read is assigned to.
     #           Find the intersection between the top and bottom hits. This is just for interest.
@@ -280,9 +281,8 @@ sub PIA {
                 # Find the intersection of any hits with the same score
                 #------------------------------------------------------
                 # For each entry in %hit_e_values, if the value contains more than one ID, find the intersection of those IDs and save it as the new value.
-                #print "List of hit E values at next header:\n"; print Dumper \%hit_e_values; print "\n\n";
-                foreach my $IDs_per_e_value (keys %hit_e_values) {
-                    my @IDs_per_e_value = split ("\t", $hit_e_values{$IDs_per_e_value});
+                foreach my $query_e_value (keys %hit_e_values) {
+                    my @IDs_per_e_value = split ("\t", $hit_e_values{$query_e_value});
                     my $number_of_IDs = @IDs_per_e_value;
                     if ($number_of_IDs > 1) { # If there is more than one ID under this score,
                         my $zeroth_route = retrieve_taxonomic_structure($IDs_per_e_value[0], $nodesfileDBM);
@@ -297,15 +297,38 @@ sub PIA {
                                 $intersection_ID = find_taxonomic_intersect($intersection_route, $next_route);  # The next intersection will always be at least as high as the current 
                             } 
                         }
-                        $hit_e_values{$IDs_per_e_value} = $intersection_ID;
+                        
+                        $hit_e_values{$query_e_value} = $intersection_ID;
                         
                     } # If there was only one ID, leave it alone.
                 }
                 
-                # %hit_e_values now contains a list of E values paired with a single taxonomic ID. Each ID represents either a real BLAST hit or an 'average' for hits with the same score. To recreate the list of BLAST hits, sort by E value (ascending, unlike score which is descending).
+                # %hit_e_values now contains a list of unique E values paired with a single taxonomic ID. Each ID represents either a real BLAST hit or an 'average' for hits with the same score.
+                # However, some of the IDs might now be repeated. If IDs are represented more than once, remove all but the hit with the best E value.
+                my %hit_e_values_IDcheck = (); # Like %hit_e_values, but where keys are IDs and values are E values, instead of the other way around. Just used for checking.
+                foreach my $query_e_value (sort keys %hit_e_values) {
+                    my $ID = $hit_e_values{$query_e_value};
+                    
+                    if (exists $hit_e_values_IDcheck{$ID}) {
+                        my $previous_e_value = $hit_e_values_IDcheck{$ID};
+                        # We only want one hit per taxon, and that hit should have best E value available (remember that the E values are all unique).
+                        if ($previous_e_value < $query_e_value) {
+                            delete $hit_e_values{$query_e_value}; # If the previous hit E value is smaller than the current one, it has priority, so delete the current hit from %hit_e_values.
+                        } else {
+                            delete $hit_e_values{$previous_e_value}; # If the current hit E value is smaller than the previous one, it has priority, so delete the previous hit from %hit_e_values.
+                        }
+       
+                    } else {
+                        $hit_e_values_IDcheck{$ID} = $query_e_value; # If we haven't noted this ID yet, do so. Pair it with the current E value.
+                    }
+                    
+                };
+
+                
+                # To recreate the list of BLAST hits, sort by E value (ascending; score is descending).  We don't need the E values themselves any more.
                 my @hit_taxa_finished = ();
-                foreach my $hit (sort {$a <=> $b} keys %hit_e_values) {
-                    push (@hit_taxa_finished, $hit_e_values{$hit});
+                foreach my $ID (sort {$a <=> $b} keys %hit_e_values) {
+                    push (@hit_taxa_finished, $hit_e_values{$ID});
                 }
                 
                 
@@ -460,7 +483,7 @@ sub PIA {
         if (exists $hit_taxa{$ID} or $ID eq 'N/A') { next BLASTLINE; } # If we already have a hit from this organism, or if the ID is 'N/A', move on to the next hit.
         $hit_taxa{$ID} = undef; # Otherwise, note the ID in %hit_taxa.
         
-        my $e_value = $line[10]; # Note the E value. Fortunately, Perl recognises that something like 3.14e-10 is a number.
+        my $e_value = $line[10]; # Note the E value (Perl recognises that something like 3.14e-10 is a number).
         if (exists $hit_e_values{$e_value}) {
             $hit_e_values{$e_value} = $hit_e_values{$e_value} . "\t" . $ID; # If other hits have had this E value, list this ID with them. We'll find their intersection at the end.
         } else {
