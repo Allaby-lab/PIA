@@ -426,7 +426,7 @@ sub PIA {
                 
                 # Print all of this information to the intersects.txt file
                 #---------------------------------------------------------
-                if ($skip == 0) { # If $skip is 1, this will print mostly null values for a header that should have been skipped. Don't want that.
+                if ($skip == 0) { # If $skip is 1, this will print mostly null values for a read that should have been skipped. Don't want that.
                     open (my $intersects_filehandle, ">>".$corename."/"."$corename".".intersects.txt") or die "Cannot write intersects file ".$corename.".intersects.txt: $!\n"; # Open intersect file for appending.
             
                     print $intersects_filehandle "Query: $current_header, first hit: $tophit_name ($tophit_ID), expect: $tophit_e_value, identities: $tophit_identities, next hit: $contrastinghit_name ($contrastinghit_ID), last hit up to cap: $bottomhit_name ($bottomhit_ID), phylogenetic range of hits up to cap: $bottom_intersect_name ($bottom_intersect_ID), number of identifiable hits: $number_of_hits, taxonomic diversity: $number_of_hit_taxa, taxonomic diversity score: $tax_diversity_score, classification intersect: $intersect_name ($intersect_ID)\n";
@@ -482,11 +482,11 @@ sub PIA {
 
         if (exists $hit_taxa{$ID} or $ID eq 'N/A') { next BLASTLINE; } # If we already have a hit from this organism, or if the ID is 'N/A', move on to the next hit.
         my $number_of_taxa_so_far = keys %hit_taxa;
-        if ($number_of_taxa_so_far == $cap) {
+        if ($number_of_taxa_so_far == ($cap -1) ) {
             print "\t\tReached taxon cap ($cap). No more hits will be considered.\n";
             print $log_filehandle "\t\tReached taxon cap ($cap). No more hits will be considered.\n";
-            $skip = 1; # If we have $cap taxa, stop looking for more hits after finishing with this one.
         }
+        if ($number_of_taxa_so_far >= $cap) { next BLASTLINE; }
         $hit_taxa{$ID} = undef; # Otherwise, note the ID in %hit_taxa.
         
         my $e_value = $line[10]; # Note the E value (Perl recognises that something like 3.14e-10 is a number).
