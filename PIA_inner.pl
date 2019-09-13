@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.9, 2019-09-12 ###############
+############## Version 4.9, 2019-09-13 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -481,6 +481,12 @@ sub PIA {
         chomp $ID;
 
         if (exists $hit_taxa{$ID} or $ID eq 'N/A') { next BLASTLINE; } # If we already have a hit from this organism, or if the ID is 'N/A', move on to the next hit.
+        my $number_of_taxa_so_far = keys %hit_taxa;
+        if ($number_of_taxa_so_far == $cap) {
+            print "\t\tReached taxon cap ($cap). No more hits will be considered.\n";
+            print $log_filehandle "\t\tReached taxon cap ($cap). No more hits will be considered.\n";
+            $skip = 1; # If we have $cap taxa, stop looking for more hits after finishing with this one.
+        }
         $hit_taxa{$ID} = undef; # Otherwise, note the ID in %hit_taxa.
         
         my $e_value = $line[10]; # Note the E value (Perl recognises that something like 3.14e-10 is a number).
