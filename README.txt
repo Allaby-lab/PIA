@@ -54,7 +54,7 @@ Outputs
 -------
 Will be in [input FASTA]_out/.
 -   [FASTA].header_out.intersects.txt: lists information for each read that passed the initial quality filter.
--   [FASTA].header_out.intersects.txt_Summary_Basic.txt: the main PIA output. Summarises any reads that passed both the quality and taxonomic diversity filters. Reads are grouped by taxon for easy interpretation. Also contains a header section that states run parameters.
+-   [FASTA].header_out.intersects.txt_Summary_Basic.txt: the main PIA output. Summarises any reads that passed both the quality and taxonomic diversity filters, excluding reads assigned to 'none' or 'root'. Reads are grouped by taxon for easy interpretation. Also contains a header section that states run parameters.
 -   [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes BLAST hits that had trouble being identified. Lots of these suggest that you might want to update/synchronise your BLAST database and NCBI reference files.
 
 

@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.9, 2019-09-13 ###############
+############## Version 4.9, 2019-09-23 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -605,7 +605,7 @@ sub simple_summary {
 	print $summary_basic_filehandle "#Series:\t$name\n"; # Output $name as a header.
 
     foreach my $intersect (keys %intersects) {
-        unless ($intersect eq "0\tnone found") {
+        unless ($intersect eq "0\tnone found" or $intersect eq "1\troot") { # Intersects that weren't found or that equal the root of the tree are not useful. Ignore these.
             print $summary_basic_filehandle $intersect . "\t" . $intersects{$intersect} . "\n";
         }
     }
