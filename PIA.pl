@@ -9,6 +9,8 @@
 ############## Version 4.9, 2019-09-13 ###############
 ######################################################
 
+my $PIA_version = 4.9;
+
 # Edited by Roselyn Ware, UoW 2018
 
 # Further edited by Becky Cribdon, UoW 2019
@@ -37,8 +39,6 @@
 ######################################################										#####################
 ########### Check arguments and Input Data ###########										###### Modules ######
 ######################################################										#####################
-
-my $PIA_version = 4.8;
 
 ##### Get arguments from command line #####
 	my %options=();
@@ -97,7 +97,7 @@ Optional
 	my $min_taxdiv_score = 0.1;
 	if ($min_taxdiv_score_opt) { $min_taxdiv_score = $min_taxdiv_score_opt;} # If there is an option, overwrite the default.
 
-	##### Check see if thread number input #####
+##### Check see if thread number input #####
 	my $threads = 2; # Set to 2 by default.
 	if ($options{t}) { $threads = $options{t};}	
 
