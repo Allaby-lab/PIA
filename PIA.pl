@@ -6,10 +6,10 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 4.9, 2019-09-13 ###############
+############## Version 5.0, 2019-09-27 ###############
 ######################################################
 
-my $PIA_version = 4.9;
+my $PIA_version = '5.0'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
 
 # Edited by Roselyn Ware, UoW 2018
 
