@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 4.9, 2019-09-23 ###############
+############## Version 5.0, 2019-09-27 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -19,7 +19,7 @@
 # - Uses pre-made DBM index files for nodes.dmp and names.dmp
 # - Only one BLAST hit is looked at per hit score. But instead of just taking the first one, it now takes an intersection of all hits with that hit score, and the taxonomic diversity of all of those hits still counts towards the diversity score. Note that if $cap was already being reached, $cap will now be reached earlier (with closer BLAST hits).
 # - Intersections are taken wherever possible. No stopping at class.
-# - Takes BLAST input not in standard format, but as "-outfmt 6 std staxid".
+# - Takes BLAST input not in standard format, but as "-outfmt 6 std staxids". Other fields may be present after the standard ones, but staxids must be the final field. If a reference sequence has multiple associated taxa (staxids), it is assigned to their intersection.
 
 # Please report any problems to r.cribdon@warwick.ac.uk.
 
@@ -257,11 +257,12 @@ sub PIA {
     
     my $current_header = 'none';
     my $current_header_number = '0'; # Interestingly, the first header will be labelled "1". This is only for humans to read though, so eh.
-    my $skip = 0; # 1 for skip, 0 for continue.
+    my $skip_header = 0; # 1 for skip, 0 for continue.
+    my $skip_rest_of_header = 0; # Same as $skip, but allows what data was collected from the header to be outputted.
     my $tophit_identities; my $tophit_e_value; # Calculated early on and simply exported to the intersects file.
     my %hit_taxa = (); # A list of the unique BLAST taxa. Used to check whether hits are to taxa that have already been seen.
     my %hit_e_values; # A list of the unique E values. Used to check whether hits share E values. E values with multiple hits are "averaged" into one "hit" by taking the intersection of the taxa involved.
-    my $number_of_hits; # A count of hits per header.
+    my $raw_hit_count; # A count of hits per header in the BLAST file.
     
     BLASTLINE: while (1) {  # Run this loop until "last" is called.
         
@@ -277,6 +278,9 @@ sub PIA {
             
             #------------------------------------------------------------------------------------------------------------------------------------------------------------------
             if (%hit_taxa) { # If there was a previous header, now that we have all of its hits, finish processing them:
+                
+                #my $number_of_taxa_before_score_collapsing = keys %hit_taxa;
+                #print "\t\tNumber of taxa before score collapsing: $number_of_taxa_before_score_collapsing\n";
                 
                 # Find the intersection of any hits with the same score
                 #------------------------------------------------------
@@ -294,7 +298,7 @@ sub PIA {
                                 my $intersection_route = retrieve_taxonomic_structure($intersection_ID, $nodesfileDBM);
                                 my $next_route = retrieve_taxonomic_structure ($next_ID, $nodesfileDBM);
                                 my $intersection_next_temp = find_taxonomic_intersect($intersection_route, $next_route);
-                                $intersection_ID = find_taxonomic_intersect($intersection_route, $next_route);  # The next intersection will always be at least as high as the current 
+                                $intersection_ID = find_taxonomic_intersect($intersection_route, $next_route);  # The next intersection will always be at least as high as the current.
                             } 
                         }
                         
@@ -323,14 +327,13 @@ sub PIA {
                     }
                     
                 };
-
                 
                 # To recreate the list of BLAST hits, sort by E value (ascending; score is descending).  We don't need the E values themselves any more.
                 my @hit_taxa_finished = ();
                 foreach my $ID (sort {$a <=> $b} keys %hit_e_values) {
                     push (@hit_taxa_finished, $hit_e_values{$ID});
                 }
-                
+
                 
                 # Look up the more information about the finished hits using their IDs
                 #---------------------------------------------------------------------
@@ -351,8 +354,9 @@ sub PIA {
 
                 # Calculate the taxonomic diversity score
                 #----------------------------------------
-                my $number_of_hit_taxa = keys %hit_taxa; # Note that this is based on the number of taxa in the BLAST hits, not the number of hits after filtering by E value.
-                my $tax_diversity_score = ($number_of_hit_taxa/$cap) - (1/$cap); # Remember, $cap defaults to 100.
+                my $taxonomic_diversity = keys %hit_taxa; # Note that this is based on the number of taxa in the BLAST hits, not the number of hits after filtering by E value.
+                #print "\t\tNumber of taxa used to calculate taxdiv score: $taxonomic_diversity\n";
+                my $tax_diversity_score = ($taxonomic_diversity/$cap) - (1/$cap); # Remember, $cap defaults to 100.
                 
                 my $contrastinghit_ID = 0; my $contrastinghit_name = 'none found'; # contrastinghit is second BLAST hit: number 1 if you're counting from 0. Default the values to null.
                 if ($number_of_finished_blast_hits > 1) { # If there is more than one finished hit:
@@ -360,7 +364,7 @@ sub PIA {
                         $contrastinghit_ID = $contrastinghit_info[0]; # Fetch the contrasting hit ID and name from its info array.
                         $contrastinghit_name = $contrastinghit_info[1]; 
                 }
-   
+
                 
                 # Find the intersection between the top and contrasting hits
                 #-----------------------------------------------------------
@@ -384,7 +388,7 @@ sub PIA {
                         }
                 }
                 
-            
+         
                 # Find the intersection between the top and bottom hits
                 #------------------------------------------------------
                 # We also find the intersection between the top hit and the bottom (within $cap): bottom_intersect. This isn't used in any calculations, but it is printed in the intersects file and might be useful one day.
@@ -422,14 +426,16 @@ sub PIA {
                             $bottom_intersect_name = retrieve_name ($bottom_intersect_ID, $namesfileDBM);
                         }
                 }
-                
+                 
                 
                 # Print all of this information to the intersects.txt file
-                #---------------------------------------------------------
-                if ($skip == 0) { # If $skip is 1, this will print mostly null values for a read that should have been skipped. Don't want that.
+                #---------------------------------------------------------               
+                if ($skip_header == 0) { # If $skip_header is 1, this will print mostly null values for a read that should have been skipped. Don't want that.
+                    
+                    my $number_of_taxa_final = scalar @hit_taxa_finished;
+                    
                     open (my $intersects_filehandle, ">>".$corename."/"."$corename".".intersects.txt") or die "Cannot write intersects file ".$corename.".intersects.txt: $!\n"; # Open intersect file for appending.
-            
-                    print $intersects_filehandle "Query: $current_header, first hit: $tophit_name ($tophit_ID), expect: $tophit_e_value, identities: $tophit_identities, next hit: $contrastinghit_name ($contrastinghit_ID), last hit up to cap: $bottomhit_name ($bottomhit_ID), phylogenetic range of hits up to cap: $bottom_intersect_name ($bottom_intersect_ID), number of identifiable hits: $number_of_hits, taxonomic diversity: $number_of_hit_taxa, taxonomic diversity score: $tax_diversity_score, classification intersect: $intersect_name ($intersect_ID)\n";
+                    print $intersects_filehandle "Query: $current_header, top hit: $tophit_name ($tophit_ID), expect: $tophit_e_value, identities: $tophit_identities, next hit: $contrastinghit_name ($contrastinghit_ID), last hit: $bottomhit_name ($bottomhit_ID), taxon count: $number_of_taxa_final, phylogenetic range: $bottom_intersect_name ($bottom_intersect_ID), raw hit count: $raw_hit_count, taxonomic diversity (up to cap if met): $taxonomic_diversity, taxonomic diversity score: $tax_diversity_score, phylogenetic intersection: $intersect_name ($intersect_ID)\n";
                 }
             }
             
@@ -440,29 +446,34 @@ sub PIA {
             
             
             # Back to the new header.
-            unless (exists $headers{$line[0]}) { # If the qseqid (query sequence ID) for this line doesn't match a header we're looking for, skip it.
+            
+            $skip_rest_of_header = 0; # Reset the rest-of-header skip.
+            
+            unless (exists $headers{$line[0]}) { # If the qseqid (query sequence ID) for this line doesn't match a header we're looking for, activate $skip_header.
                 $current_header = $line[0]; # Define the current header.
-                $skip = 1;
+                #print "\tSkipping header $current_header\n";
+                $skip_header = 1;
                 next BLASTLINE;
             }
 
             $current_header = $line[0]; # Define the current header.
+            
             $current_header_number ++;
             print "\t$current_header_number of $number_of_headers: $line[0]\n";
             print $log_filehandle "\t$current_header_number of $number_of_headers: $line[0]\n";
             
-            $number_of_hits = 0; %hit_taxa = (); %hit_e_values = (); # Each header gets its own hit count, %hit_taxa and %hit_e_values.
+            $raw_hit_count = 0; %hit_taxa = (); %hit_e_values = (); # Each header gets its own $raw_hit_count, %hit_taxa and %hit_e_values.
                 
             # Check coverage of the top hit:
             my $read_length = $headers{$line[0]};
             my $coverage = $line[3] / $headers{$line[0]}; # Coverage = [match length] / [read length]
             my $min_coverage = $min_coverage_perc / 100;
-            if ($coverage < $min_coverage) { # If the top BLAST hit doesn't have at least $min_coverage, activate $skip for this header.
+            if ($coverage < $min_coverage) { # If the top BLAST hit doesn't have at least $min_coverage, activate $skip_header.
                 #print "\t\tTop hit doesn't have sufficient coverage. Skipping.\n";
                 #print $log_filehandle "\t\tTop hit doesn't have sufficient coverage. Skipping.\n";
-                $skip = 1;
+                $skip_header = 1;
                 next BLASTLINE;
-            } else { $skip = 0 }; # Otherwise, turn $skip off.
+            } else { $skip_header = 0 }; # Otherwise, turn $skip_header off.
                 
             $tophit_identities = $line[2]; # Note the Identities score.
             $tophit_e_value = $line[10]; # Note the E value. These will eventually be exported in the intersects file.     
@@ -470,23 +481,49 @@ sub PIA {
         #======================================================================================================================================================================
         
         # For all lines until the next header:
-        if ($skip == 1) {
-            $number_of_hits ++; # Count the hit, but then move on.
+        
+        $raw_hit_count ++; # Even if we're skipping this hit, add it to the raw count.
+        
+        if ($skip_header == 1 or $skip_rest_of_header == 1) { next BLASTLINE; }
+        
+        my $ID;
+        chomp $line[-1]; # Remove the pesky newline. I'm assuming the final field is staxids.
+        
+        if (index ($line[-1], ';') != -1) { # If the field contains a ';', it contains multiple taxa.
+            print "\t\tAssigning hit $line[1] to intersection of associated taxa.\n";
+            print $log_filehandle "\t\tAssigning hit $line[1] to intersection of associated taxa.\n";
+            my @associated_IDs = split (';', $line[-1]); # If there are multiple associated IDs, assign the hit to their phylogenetic intersection. For that, we need routes.
+            my $zeroth_route = retrieve_taxonomic_structure($associated_IDs[0], $nodesfileDBM);
+            my $first_route = retrieve_taxonomic_structure ($associated_IDs[1], $nodesfileDBM);
+            my $intersection_ID = find_taxonomic_intersect ($zeroth_route, $first_route); # This is the initial intersection.
+
+            if ($associated_IDs[2]) { # If there are also additional IDs, find their intersection with the initial one.
+                    foreach my $next_ID (@associated_IDs[2 .. $#associated_IDs]) { # This is an array slice. We don't want to process elements 0-1 of @IDs_per_score again.
+                        my $intersection_route = retrieve_taxonomic_structure($intersection_ID, $nodesfileDBM);
+                        my $next_route = retrieve_taxonomic_structure ($next_ID, $nodesfileDBM);
+                        my $intersection_next_temp = find_taxonomic_intersect($intersection_route, $next_route);
+                        $intersection_ID = find_taxonomic_intersect($intersection_route, $next_route);  # The next intersection will always be at least as high as the current.
+                    } 
+            }
+            
+            $ID = $intersection_ID;
+            
+        } else {
+            $ID = $line[-1]; # If the reference seqeunce ID field is identical to the "associated taxa" field, the reference is only associated with the organism it came from. So just take that as the ID.
+        }
+
+
+        if (exists $hit_taxa{$ID} or $ID eq 'N/A' or $ID == 0) { next BLASTLINE; } # If we already have a hit from this organism, or if the ID for this hit is 'N/A' (some references aren't identified) or 0 (tried and failed to find an intersection), skip this hit.
+
+        my $number_of_taxa_before_this_hit = keys %hit_taxa;
+
+        if ($number_of_taxa_before_this_hit == $cap) { # Once $cap taxa have been found, subsequent hits are skipped, because new hits will either be to existing taxa so skipped, or to new taxa that would be above $cap.
+            print "\t\tTaxon cap ($cap) reached. Ignoring subsequent hits.\n";
+            print $log_filehandle "\t\tTaxon cap ($cap) reached. Ignoring subsequent hits.\n";
+            $skip_rest_of_header = 1;
             next BLASTLINE;
         }
-
-        $number_of_hits ++; # Count the hit.
         
-        my $ID = $line[12]; # Note the taxonomic ID of the organism this hit comes from.
-        chomp $ID;
-
-        if (exists $hit_taxa{$ID} or $ID eq 'N/A') { next BLASTLINE; } # If we already have a hit from this organism, or if the ID is 'N/A', move on to the next hit.
-        my $number_of_taxa_so_far = keys %hit_taxa;
-        if ($number_of_taxa_so_far == ($cap -1) ) {
-            print "\t\tReached taxon cap ($cap). No more hits will be considered.\n";
-            print $log_filehandle "\t\tReached taxon cap ($cap). No more hits will be considered.\n";
-        }
-        if ($number_of_taxa_so_far >= $cap) { next BLASTLINE; }
         $hit_taxa{$ID} = undef; # Otherwise, note the ID in %hit_taxa.
         
         my $e_value = $line[10]; # Note the E value (Perl recognises that something like 3.14e-10 is a number).
@@ -574,19 +611,18 @@ sub simple_summary {
     
     # Get a list of classification intersects where the taxa diversity score was at least $min_taxdiv_score.
 	foreach my $line (readline ($intersects_filehandle)){
-		my @row= split(/, classification intersect: |, id confidence class: /, $line); # Split on the classification intersect field first (note that it won't match to "most distant classification intersect"), followed by the ID confidence field. This is not an 'or'. It's one after the other, chopping off text from the left and right sides to leave just the classification intersect value in the middle.
-		my @check= split(/ diversity score: |, classification intersect: /, $line); # Similarly, leave just the taxonomic diversity score.
-        
-        if ($check[1] >= $min_taxdiv_score ){ # $check[1] is the taxa diversity score. 'none found' means there was no intersect.
-            
-            # Change the format of the name field ($row[1]) for outputting.
-            my $name_field = $row[1];
-            my @name_field = split (/ /, $name_field);
-            my $ID = pop @name_field; # The ID is the last word.
+		my @split_on_intersection = split(/intersection: /, $line); # Split on the intersection field.
+        my @split_on_score = split(/ diversity score: |, phylo/, $line); # Split on the taxonomic diversity score field title followed by its comma-space. This is not an 'or'. It will split the line in two places and leave the score value as the middle element.
+
+        if ($split_on_score[2] >= $min_taxdiv_score ){
+            # Change the format of the intersection field for outputting.
+            my $intersection_field = $split_on_intersection[1];
+            my @intersection_field = split (/ /, $intersection_field);
+            my $ID = pop @intersection_field; # The ID is the last word.
             chomp $ID;
             $ID =~ tr/()//d; # Remove the parentheses from it (this is transliterate with delete).
-            $name_field = join (" ", @name_field); # Join the remaining words back together. These are the taxon name.
-            my $ID_and_name = $ID . "\t" . $name_field; # Join the ID and namewith a tab.
+            $intersection_field = join (" ", @intersection_field); # Join the remaining words back together. These are the taxon name.
+            my $ID_and_name = $ID . "\t" . $intersection_field; # Join the ID and namewith a tab.
             
             if (exists $intersects{$ID_and_name}) {
                 $intersects{$ID_and_name} = $intersects{$ID_and_name} + 1;
