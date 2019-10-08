@@ -47,7 +47,7 @@ Usage
 ------
 -   Run PIA_index_maker.pl:
     >perl PIA_index_maker.pl
-    This generates DBM index files for names.dmp and nodes.dmp. You will need to make new index files every time you change these files and when you want to run the PIA on a new machine. The index files do not reliably transfer between machines (something to do with DB_File).
+    This generates DBM index files for names.dmp and nodes.dmp. You will need to make new index files if you change the .dmp files or if you want to run the PIA on a new machine. The index files do not reliably transfer between machines (something to do with DB_File).
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
     >perl PIA.pl -f [input FASTA] -b [input BLAST file] -t [number of threads] [other options for advanced users]
 -   To run PIA_inner.pl alone, see notes at the top of PIA_inner.pl.
