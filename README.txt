@@ -5,7 +5,7 @@ The Phylogenetic Intersection Analysis
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
 Version 5.0
-2019-09-27
+2019-10-08
 
 The phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -17,12 +17,20 @@ Prerequisites
 -   Perl 5
 -   Perl module List::MoreUtils
 -   Perl module DB_File
--   Add to Reference_files/ names.dmp and nodes.dmp from the NCBI: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
--   For Collate_summary_basics.pl only: add to Reference_files/ fullnamelineage.dmp from the NCBI
 
 
-Files and directories
----------------------
+Setting up
+----------
+-   Go to https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/ and download taxdump.tar.gz. Uncompress.
+-   Move names.dmp and nodes.dmp to Reference_files/.
+-   For Collate_summary_basics.pl only: move fullnamelineage.dmp to Reference_files/.
+-   Have all PIA files and directories in the same directory (see tree below). Note that you should be able to run the PIA on multiple FASTA files in the same directory simultaneously, but this has not been thoroughly tested.
+-   The input FASTA and corresponding input BLAST must have the same headers (sequence names). If the FASTA headers are very long, BLAST may crop them. Change header names if necessary to prevent this.
+-   BLAST your data with this format option: -outfmt "6 std staxids". Other fields may be present after the standard ones, but staxids must be the final field.
+
+
+Files and directories when ready to start
+-----------------------------------------
 Reference_files/
     names.dmp
     nodes.dmp
@@ -37,10 +45,9 @@ PIA_inner.pl
 
 Usage
 ------
--   The input FASTA and corresponding input BLAST must have the same headers (sequence names). If the FASTA headers are very long, BLAST may crop them. Change header names if necessary to prevent this.
--   BLAST your data with this format option: -outfmt "6 std staxids". Other fields may be present after the standard ones, but staxids must be the final field.
--   Have all PIA files and directories in the same directory. Note that you should be able to run the PIA on multiple FASTA files in the same directory simultaneously, but this has not been thoroughly tested.
--   Run PIA_index_maker.pl. This generates DBM index files for names.dmp and nodes.dmp. You will need to make new index files every time you change these files and when you want to run the PIA on a new machine. The index files do not reliably transfer between machines (something to do with DB_File).
+-   Run PIA_index_maker.pl:
+    >perl PIA_index_maker.pl
+    This generates DBM index files for names.dmp and nodes.dmp. You will need to make new index files every time you change these files and when you want to run the PIA on a new machine. The index files do not reliably transfer between machines (something to do with DB_File).
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
     >perl PIA.pl -f [input FASTA] -b [input BLAST file] -t [number of threads] [other options for advanced users]
 -   To run PIA_inner.pl alone, see notes at the top of PIA_inner.pl.
