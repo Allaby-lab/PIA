@@ -363,6 +363,8 @@ sub PIA {
                         my @contrastinghit_info = split ("\t", $all_hit_info[1]);
                         $contrastinghit_ID = $contrastinghit_info[0]; # Fetch the contrasting hit ID and name from its info array.
                         $contrastinghit_name = $contrastinghit_info[1]; 
+                } else {
+                    print "\t\tOnly one hit in final processed list. Cannot find intersection.\n";
                 }
 
                 
@@ -373,6 +375,7 @@ sub PIA {
                 my @tophit_info = split ("\t", $all_hit_info[0]); # tophit is the top BLAST hit. Unless the top hit wasn't identified, it's also the first BLAST taxon. We ignore unidentified hits.
         
                 $tophit_ID = $tophit_info[0];
+                if ($tophit_ID == 0) { print "\t\tCould not identify top hit. ID is 0. Cannot find intersection.\n"; }
                 
                 if ($number_of_finished_blast_hits > 1) { # If there is more than one BLAST hit:
                         unless ($tophit_ID == 0) { # The BLAST taxa might not all be the same, but if the top taxon has ID 0, a proper ID was never found and we can't calculate an intersect.
@@ -451,7 +454,7 @@ sub PIA {
             
             unless (exists $headers{$line[0]}) { # If the qseqid (query sequence ID) for this line doesn't match a header we're looking for, activate $skip_header.
                 $current_header = $line[0]; # Define the current header.
-                #print "\tSkipping header $current_header\n";
+                print "\tSkipping header $current_header\n";
                 $skip_header = 1;
                 next BLASTLINE;
             }
@@ -469,8 +472,8 @@ sub PIA {
             my $coverage = $line[3] / $headers{$line[0]}; # Coverage = [match length] / [read length]
             my $min_coverage = $min_coverage_perc / 100;
             if ($coverage < $min_coverage) { # If the top BLAST hit doesn't have at least $min_coverage, activate $skip_header.
-                #print "\t\tTop hit doesn't have sufficient coverage. Skipping.\n";
-                #print $log_filehandle "\t\tTop hit doesn't have sufficient coverage. Skipping.\n";
+                print "\t\tTop hit doesn't have sufficient coverage. Skipping.\n";
+                print $log_filehandle "\t\tTop hit doesn't have sufficient coverage. Skipping.\n";
                 $skip_header = 1;
                 next BLASTLINE;
             } else { $skip_header = 0 }; # Otherwise, turn $skip_header off.
@@ -601,8 +604,8 @@ sub simple_summary {
 	my ($intersects_filename, $min_taxdiv_score) = @_;
     
     unless (-e $intersects_filename) { # If there was no intersects file:
-        print "No reads passed the coverage check. No intersects file produced.\n";
-        print $log_filehandle "No reads passed the coverage check. No intersects file produced.\n";
+        print "\nNo reads passed the coverage check. No intersects file produced.\n";
+        print $log_filehandle "\nNo reads passed the coverage check. No intersects file produced.\n";
         return 'none';
     }
     
@@ -622,7 +625,7 @@ sub simple_summary {
             chomp $ID;
             $ID =~ tr/()//d; # Remove the parentheses from it (this is transliterate with delete).
             $intersection_field = join (" ", @intersection_field); # Join the remaining words back together. These are the taxon name.
-            my $ID_and_name = $ID . "\t" . $intersection_field; # Join the ID and namewith a tab.
+            my $ID_and_name = $ID . "\t" . $intersection_field; # Join the ID and name with a tab.
             
             if (exists $intersects{$ID_and_name}) {
                 $intersects{$ID_and_name} = $intersects{$ID_and_name} + 1;
@@ -633,16 +636,16 @@ sub simple_summary {
 	}
     close $intersects_filehandle;
     
-	my @name=split ("\/",$intersects_filename); # Pick out a sample name from $PIAinputname to use in the output file.
-	my $name=$name[0];
+	my @name = split ("\/",$intersects_filename); # Pick out the sample name from $intersecs_filename to use in the output file.
+	my $name = $name[0];
     
-    my $summary_basic_filename = $name."_Summary_Basic.txt";
-	open (my $summary_basic_filehandle, ">", $intersects_filename . "_Summary_Basic.txt") or die "Cannot write output file: $!\n";
+#    my $summary_basic_filename = $name."_Summary_Basic.txt";
+	open (my $summary_basic_filehandle, '>', $intersects_filename . "_Summary_Basic.txt") or die "Cannot write summary basic file: $!\n";
 	print $summary_basic_filehandle "#Series:\t$name\n"; # Output $name as a header.
 
     foreach my $intersect (keys %intersects) {
         unless ($intersect eq "0\tnone found" or $intersect eq "1\troot") { # Intersects that weren't found or that equal the root of the tree are not useful. Ignore these.
-            print $summary_basic_filehandle $intersect . "\t" . $intersects{$intersect} . "\n";
+            print $summary_basic_filehandle "$intersect\t$intersects{$intersect}\n";
         }
     }
 
