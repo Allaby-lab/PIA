@@ -6,35 +6,25 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 5.0, 2019-09-27 ###############
+############## Version 5.1, 2020-02-27 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
-# A method of metagenomic phylogenetic assignation, designed to be robust to partial representation of organisms in the database		
+# Further edited by Becky Cribdon, UoW 2019
 		
-# Further edited by Becky Cribdon, UoW 2019.
-# - Added a log.
-# - Made variable names more consistent and meaningful.
-# - Removed $blastfile2 and functions that were not fully implemented.
-# - Uses pre-made DBM index files for nodes.dmp and names.dmp
-# - Only one BLAST hit is looked at per hit score. But instead of just taking the first one, it now takes an intersection of all hits with that hit score, and the taxonomic diversity of all of those hits still counts towards the diversity score. Note that if $cap was already being reached, $cap will now be reached earlier (with closer BLAST hits).
-# - Intersections are taken wherever possible. No stopping at class.
-# - Takes BLAST input not in standard format, but as "-outfmt 6 std staxids". Other fields may be present after the standard ones, but staxids must be the final field. If a reference sequence has multiple associated taxa (staxids), it is assigned to their intersection.
-
+# A method of metagenomic phylogenetic assignation, designed to be robust to partial representation of organisms in the database		
 # Please report any problems to r.cribdon@warwick.ac.uk.
 
 # This usually runs inside PIA.pl. To run independently, PIA.pl must already have made a header file containing the name and length of every sequence in the FASTA. 
 # Then run PIA_inner.pl giving the header file as -f and a BLAST file as -b.
 # > perl PIA_inner.pl -f [header file] -b [BLAST file]
 
-
-
 	use strict;
 	use warnings;
 	use Getopt::Std;
     use DB_File;
     use Fcntl;
-	use Data::Dumper qw(Dumper); # Only used for testing
+	#use Data::Dumper qw(Dumper); # Only used for testing
     
 
 ######################################################										#####################
@@ -82,21 +72,18 @@ Optional
 
 ##### See if cap input #####
 	# BLAST hits are all assigned to taxa. $cap is the maximum number of taxa to be looked at. If $cap is hit, no more BLAST hits will be considered. $cap is used to calculate the taxonomic diversity score, so affects the minimum score threshold (option s). Default is 100.	
-	my $cap_opt = ($options{c});
 	my $cap = 100;
-	if ($cap_opt) { $cap = $cap_opt;} # If there is an option, overwrite the default.
+	if ($options{c}) { $cap = $options{c}; } # If there is an option, overwrite the default.
 
 ##### See if min % coverage input #####
 	# The minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
-	my $min_coverage_perc_opt = ($options{C});
 	my $min_coverage_perc = 95;
-	if ($min_coverage_perc_opt) { $min_coverage_perc = $min_coverage_perc_opt;} # If there is an option, overwrite the default.
+	if ($options{C}) { $min_coverage_perc = $options{C}; } # If there is an option, overwrite the default.
     
 ##### See if min taxonomic diversity score input #####
 	# The minimum taxonomic diversity score a read must have to make it to Summary_Basic.txt. Depends on $cap. Defaults to 0.1.
-	my $min_taxdiv_score_opt = ($options{s});
 	my $min_taxdiv_score = 0.1;
-	if ($min_taxdiv_score_opt) { $min_taxdiv_score = $min_taxdiv_score_opt;} # If there is an option, overwrite the default.
+	if ($options{s}) { $min_taxdiv_score = $options{s}; } # If there is an option, overwrite the default.
 
 
 ######################################

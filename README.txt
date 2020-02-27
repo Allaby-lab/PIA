@@ -2,8 +2,8 @@ Phylogenetic Intersection Analysis
 ==================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
-Version 5.0
-2019-10-14
+Version 5.1
+2020-02-27
 
 Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -20,7 +20,6 @@ Prerequisites
 BLASTing your input FASTA
 -------------------------
 -   PIA interprets BLAST output from your query FASTA.
--   Read names must be identical in the FASTA and BLAST files. If the read names in your FASTA contains whitespace, the BLAST file will truncate them and they will no longer be identical.
 -   This is the basic recommended BLAST command:
     blastn -db [database] -num_threads [n] -query [input FASTA] -out [output]  -max_target_seqs 500 -outfmt "6 std staxids"
 -   -max_target_seqs 500 returns up to the first ~500 hits for each read. PIA only considers a finite amount that is probably some way below 500. 500 is a safe bet for now.
@@ -31,14 +30,11 @@ Setting up PIA
 --------------
 -   Go to https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/ and download taxdump.tar.gz. Uncompress.
 -   Move names.dmp and nodes.dmp to Reference_files/.
--   For Collate_summary_basics.pl only: move fullnamelineage.dmp to Reference_files/.
 -   Have all PIA files and directories in the same directory (see tree below). Note that you should be able to run PIA on multiple FASTA files in the same directory simultaneously, but this has not been thoroughly tested.
 
 Reference_files/
     names.dmp
     nodes.dmp
-    fullnamelineage.dmp (for Collate_summary_basics.pl only)
-(Collate_summary_basics.pl)
 PIA.pl
 PIA_index_maker.pl
 PIA_inner.pl
@@ -54,8 +50,6 @@ Usage
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
     >perl PIA.pl -f [input FASTA] -b [input BLAST file] -t [number of threads] [optional options for advanced users]
     While PIA.pl is running, each thread will generate a PIA_inner.log.txt. Look at that file to see how far the thread has progressed through its list of sequences.
--   OPTIONAL: collate Summary_Basic.txt output from multiple FASTAs using Collate_summary_basics.pl as follows:
-    >perl Collate_summary_basics.pl [optional options] [summary basics]
 
 Please report any problems to r.cribdon@warwick.ac.uk.
 

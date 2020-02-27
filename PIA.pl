@@ -6,18 +6,16 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 5.0, 2019-09-27 ###############
+############## Version 5.1, 2020-02-27 ###############
 ######################################################
 
-my $PIA_version = '5.0'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
+my $PIA_version = '5.1'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
 
 # Edited by Roselyn Ware, UoW 2018
-
 # Further edited by Becky Cribdon, UoW 2019
-# - Deals with log files from PIA_inner.pl and makes its own timer log.
-# - Collapses hits in the final Summary_Basic.txt.
-# - Converts the input FASTA into a header file. This contains the ID and length for every read in the FASTA. This allows it to accept FASTAs as well as ready-made header files.
-# - Should be able to run simultanously on multiple FASTAs in the same directory.
+		
+# A method of metagenomic phylogenetic assignation, designed to be robust to partial representation of organisms in the database		
+# Please report any problems to r.cribdon@warwick.ac.uk.
 
 	use strict;
 	use warnings;
@@ -67,7 +65,7 @@ Optional
 	-C	min % coverage			Optional	Minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
 	-h	help				N		Print this help text.
 	-s	min tax diversity score		Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt. Depends on cap. Default is 0.1.
-	-t	threads				Optional	PIA.pl only. Split the header file into x subfiles and run PIA_inner.pl on each one. Default is 2.
+	-t	threads				Optional	PIA.pl only. Split the header file into x subfiles and run PIA_inner.pl on each one. Default is 1.
 ";
         exit;
 	}
@@ -81,24 +79,30 @@ Optional
 
 ##### See if cap input #####
 	# BLAST hits are all assigned to taxa. $cap is the maximum number of taxa to be looked at. If $cap is hit, no more BLAST hits will be considered. $cap is used to calculate the taxonomic diversity score, so affects the minimum score threshold (option s). Default is 100.	
-	my $capopt = ($options{c});
 	my $cap = 100;
-	if ($capopt) { $cap = $capopt;} # If there is an option, overwrite the default.
+	if ($options{c}) { # If there is an option, overwrite the default.
+        $cap = $options{c};
+    }
+    print "\nMax taxa to consider: $cap\n";
 
 ##### See if min % coverage input #####
 	# The minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
-	my $min_coverage_perc_opt = ($options{C});
 	my $min_coverage_perc = 95;
-	if ($min_coverage_perc_opt) { $min_coverage_perc = $min_coverage_perc_opt;} # If there is an option, overwrite the default.
+	if ($options{C}) { # If there is an option, overwrite the default.
+        $min_coverage_perc = $options{C};
+    }
+    print "Min coverage %: $min_coverage_perc\n";
 
 ##### See if min taxonomic diversity score input #####
 	# The minimum taxonomic diversity score a read must have to make it to Summary_Basic.txt. Depends on $cap. Defaults to 0.1.
-	my $min_taxdiv_score_opt = ($options{s});
 	my $min_taxdiv_score = 0.1;
-	if ($min_taxdiv_score_opt) { $min_taxdiv_score = $min_taxdiv_score_opt;} # If there is an option, overwrite the default.
+	if ($options{s}) { # If there is an option, overwrite the default.
+        $min_taxdiv_score = $options{s};
+    }
+    print "Min taxonomic diversity score: $min_taxdiv_score\n\n";
 
 ##### Check see if thread number input #####
-	my $threads = 2; # Set to 2 by default.
+	my $threads = 1; # Set to 1 by default.
 	if ($options{t}) { $threads = $options{t};}	
 
 
@@ -119,12 +123,11 @@ while (1) { # Run this loop until "last" is called.
     my $record = <$fasta_filehandle>; # Read the next line from the names file.
     if (! defined $record) { last }; # If there is no next line, exit the loop. You've processed the whole file. 
     
-    my @record = split("\n", $record); # Split the record into its two lines plus the delimiter.
-    #print Dumper @record; print "\n\n";
-    if ($record[1]) { # The first record is just the delimiter. Is there a way to just skip that one?
-        my $sequence = $record[1]; # The sequence is the last line.
-        my $sequence_length = length $sequence;
-        print $header_filehandle $record[0] . "\t$sequence_length\n";
+    my @record = split("\n", $record); # Split the record into its two lines.
+    if ($record[1]) { # Is there ever a record without a sequence? Whoever first wrote PIA thought so.
+        my @sequence_name = split (' ', $record[0]); # The 0th record is the sequence name (qseqid in BLAST lingo). If there's a space BLAST only takes what comes before the space, so we must do the same.
+        my $sequence_length = length $record[1]; # The sequence is the 1st line.
+        print $header_filehandle $sequence_name[0] . "\t$sequence_length\n";
     }
 }
 close $fasta_filehandle;
