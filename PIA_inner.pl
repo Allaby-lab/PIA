@@ -57,7 +57,7 @@ Optional
  	-c 	cap			Optional	Maximum unique BLAST taxa examined. Impacts taxonomic diversity score. Default is 100.
 	-C	min % coverage		Optional	Minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
 	-h	help			N		Print this help text.
-	-s	min diversity score	Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt. Depends on cap. Default is 0.1.
+	-s	min diversity score	Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt and Summary_Reads.txt. Depends on cap. Default is 0.1.
 	-t	threads			Optional	PIA.pl only. Split the header file into x subfiles and run PIA_inner.pl on each one. Default is 2.
 ";
         exit;
@@ -638,7 +638,7 @@ sub simple_summary {
 	my $name = $name[0];
     
     my $summary_basic_filename = $intersects_filename . '_Summary_Basic.txt';
-	open (my $summary_basic_filehandle, '>', $summary_basic_filename) or die "Cannot write summary basic file: $!\n";
+	open (my $summary_basic_filehandle, '>', $summary_basic_filename) or die "Cannot write Summary Basic file: $!\n";
 	print $summary_basic_filehandle "#Series:\t$name\n"; # Output $name as a header. This is only temporary.
 
     foreach my $intersect (keys %intersects) {
@@ -658,7 +658,7 @@ sub reads_summary {
         return 'none';
     }
     
-	open (my $intersects_filehandle, $intersects_filename) or die "Cannot open intersects file for generating summary reads: $!\n";			
+	open (my $intersects_filehandle, $intersects_filename) or die "Cannot open intersects file for generating Summary Reads: $!\n";			
 	my %read_ID_taxon = (); # Keys are read names. Values are IDs and taxon names in the format "ID\taxon".
     
     # Get a list of classification intersects where the taxa diversity score was at least $min_taxdiv_score.
@@ -694,7 +694,7 @@ sub reads_summary {
 	my $name = $name[0];
     
     my $summary_reads_filename = $intersects_filename . '_Summary_Reads.txt';
-	open (my $summary_reads_filehandle, '>', $summary_reads_filename) or die "Cannot write summary reads file: $!\n";
+	open (my $summary_reads_filehandle, '>', $summary_reads_filename) or die "Cannot write Summary Reads file: $!\n";
 	print $summary_reads_filehandle "#Series:\t$name\n"; # Output $name as a header. This is only temporary.
 
     foreach my $read (keys %read_ID_taxon) {
