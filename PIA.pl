@@ -6,10 +6,10 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 5.1, 2020-02-27 ###############
+############## Version 5.2, 2020-03-05 ###############
 ######################################################
 
-my $PIA_version = '5.1'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
+my $PIA_version = '5.2'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
 
 # Edited by Roselyn Ware, UoW 2018
 # Further edited by Becky Cribdon, UoW 2019
@@ -22,7 +22,7 @@ my $PIA_version = '5.1'; # String instead of numeric because otherwise it can 'h
 	use Getopt::Std;
 	use File::Copy qw(copy);
     use File::Path;
-	#use Data::Dumper qw(Dumper); # Only used for testing
+	use Data::Dumper qw(Dumper); # Only used for testing
 
 # Run as follows:
 # perl PIA.pl -f [FASTA file] -b [BLAST file] -t [number of threads]
@@ -54,18 +54,18 @@ my $PIA_version = '5.1'; # String instead of numeric because otherwise it can 'h
         print "Usage: perl PIA.pl -f <file> -b <blast.txt> [options]
 
 Main Arguments
-	Option	Description			Input		Explanation
-	-f	FASTA or header filename	Y		FASTA of reads to PIA. Sequence names must be short enough for BLAST to not crop them.
-	-b	BLAST filename			Y		BLAST filename containing entries for all reads in the FASTA (can contain other entries too).
+	Option	Description	Input		Explanation
+	-f	FASTA filename	Y		FASTA of reads to analyse.
+	-b	BLAST filename	Y		BLAST filename containing entries for all reads in the FASTA (can contain other entries too).
 
 
 Optional
-	Option	Description			Input		Explanation
- 	-c 	cap				Optional	Maximum unique BLAST taxa examined. Impacts taxonomic diversity score. Default is 100.
-	-C	min % coverage			Optional	Minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
-	-h	help				N		Print this help text.
-	-s	min tax diversity score		Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt. Depends on cap. Default is 0.1.
-	-t	threads				Optional	PIA.pl only. Split the header file into x subfiles and run PIA_inner.pl on each one. Default is 1.
+	Option	Description		Input		Explanation
+ 	-c 	cap			Optional	Maximum unique BLAST taxa examined. Impacts taxonomic diversity score. Default is 100.
+	-C	min % coverage		Optional	Minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
+	-h	help			N		Print this help text.
+	-s	min diversity score	Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt. Depends on cap. Default is 0.1.
+	-t	threads			Optional	PIA.pl only. Split the header file into x subfiles and run PIA_inner.pl on each one. Default is 1.
 ";
         exit;
 	}
@@ -159,7 +159,7 @@ my $shellscript = 'shellscript_' . $header_filename . '.txt';
 unless(open FILE, '>'."$shellscript") { die "\nUnable to create $shellscript\n"; }
 
 foreach my $file (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.
-		print FILE "perl PIA_inner.pl -f $file -b $blast_filename -c $cap -C $min_coverage_perc -s $min_taxdiv_score &\n";
+		print FILE "perl PIA_inner.pl -H $file -b $blast_filename -c $cap -C $min_coverage_perc -s $min_taxdiv_score &\n";
 } # Ending in "&" means that the command is told to run in the background, so new commands can be started on top. The split header files will be processed alongside each other. That's threading.
 
 close FILE; # Close $shellscript. We're finished editing its contents.
@@ -167,62 +167,67 @@ chmod 0755, "$shellscript"; # But still need to change the permissions.
 `./$shellscript `; # Finally, run it.
 
 
-# Collate the PIA_inner.pl outputs from each thread
-#--------------------------------------------------
+# Concatenate the PIA_inner.pl outputs from each thread
+#------------------------------------------------------
 my @splitfiles2 = `ls . | grep $header_filename... | grep -v "out" `; # -v means "invert". This line searches for files or directories starting with $tophitfile but that don't contain "out". The items are separated by newlines.
 
 my @splitfolders = `ls . | grep $header_filename... | grep "out" `; # This searches for files or directories starting with $tophitfile that do contain "out". These will be directories that PIA_inner.pl has just made, such as test.headeraaa_out/. The items are separated by newlines.
 
 my @outIntersects;
-my @Summary;
+my @outBasics;
+my @outReads;
 my @logs;
 
-foreach my $file (@splitfolders){ # For every directory that PIA_inner.pl just made, look at its files:
-		chomp $file; # Not sure why, but this is necessary.
-	
-		if (`ls $file | grep "_out.intersects.txt"`){
-				push @outIntersects, ($file."/".`ls $file | grep "_out.intersects.txt"| grep -v "_out.intersects.txt_Summary_Basic.txt"`);
-		}
-		if (`ls $file | grep "_out.intersects.txt_Summary_Basic.txt" `){
-				push @Summary, ($file."/".`ls $file | grep "_out.intersects.txt_Summary_Basic.txt"`);
-		}
-		if (`ls $file | grep "_PIA_inner_log.txt"`){
-				push @logs, ($file."/".`ls $file | grep "_PIA_inner_log.txt"`); # List all log files in @logs.
-		}
+foreach my $splitfolder (@splitfolders){ # For every directory that PIA_inner.pl just made, look at its files:
+		chomp $splitfolder;
+
+        my $intersects_filename = $splitfolder . '/' . $splitfolder . '.intersects.txt';
+        push (@outIntersects, $intersects_filename);
+        push (@outBasics, $intersects_filename . '_Summary_Basic.txt');
+        push (@outReads, $intersects_filename . '_Summary_Reads.txt');
+        
+        my $log_filename = $splitfolder . '/' . $splitfolder . '_PIA_inner_log.txt';
+        push (@logs, $log_filename);
 }
 
 
 mkdir "$header_filename"."_out"; # Make a master output folder to collect all output in.
 
 # Now make a variable for the filename of each of these PIA_inner.pl output files we've just looked at.
-my $OI = $header_filename."_out/".$header_filename."_out.intersects.txt"; # So, $OI represents a collated, master out.intersects file inside the output folder. Note that this and $S get "out." because they are more of an output than the log.
-my $S = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Basic.txt";
-my $L = $header_filename."_out/".$header_filename."_PIA_inner_logs.txt";
+my $intersects_filename = $header_filename."_out/".$header_filename."_out.intersects.txt"; # So, $OI represents a collated, master out.intersects file inside the output folder. Note that this and $S get "out." because they are more of an output than the log.
+my $SB_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Basic.txt";
+my $SR_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Reads.txt";
+my $log_filename = $header_filename."_out/".$header_filename."_PIA_inner_logs.txt";
 
 foreach my $data_file (@outIntersects) {
 	chomp $data_file;
-	`cat $data_file >>$OI`;
+	`cat $data_file >>$intersects_filename`;
 }
-foreach my $data_file (@Summary) {
+foreach my $data_file (@outBasics) {
 	chomp($data_file);
-	system("cat $data_file >>$S");
+	system("cat $data_file >>$SB_filename");
+}
+foreach my $data_file (@outReads) {
+	chomp($data_file);
+	system("cat $data_file >>$SR_filename");
 }
 foreach my $data_file (@logs) {
 	chomp($data_file);
-	system("cat $data_file >>$L");
+	system("cat $data_file >>$log_filename");
 }
 
 
 # Collapse duplicates in the summary basic file
 #----------------------------------------------
-if (-e $S) { # If there were actually any summary basics to start with.
-        open (my $S_filehandle, $S) or die "Could not open summary basic file $S for collapsing: $!\n"; # Read in the uncollapsed file.
+if (-e $SB_filename) { # If there were actually any summary basics to start with.
+        open (my $SB_filehandle, $SB_filename) or die "Could not open $SB_filename for collapsing: $!\n"; # Read in the combined file.
         my %taxa_and_hits = ();
-        foreach my $line (readline($S_filehandle)) {
+        foreach my $line (readline($SB_filehandle)) {
             
             if (index ($line, '#') != -1) {
                 next; # If the line contains a hash symbol, which indicates the header line, skip it.
             }
+            
             chomp $line;
             my @line = split("\t", $line);
         
@@ -234,22 +239,63 @@ if (-e $S) { # If there were actually any summary basics to start with.
                 $taxa_and_hits{$ID_and_name} = $hit_count;
             }
         }
-        close $S_filehandle;
+        close $SB_filehandle;
         
-        my @OI = split ('/', $OI); # Take the intersects file name. If $OI is a path, find the file name on the end.
-        my $sample_filename = $OI[-1];
+        my $total_reads = 0;
+        foreach my $ID_and_name (keys %taxa_and_hits) {
+            $total_reads = $total_reads + $taxa_and_hits{$ID_and_name};
+        }
         
-        open ($S_filehandle,'>', $S) or die "Could not open summary basic file $S: $!\n"; # Open the file again, this time to overwrite.
+        my @intersects_filename = split ('/', $intersects_filename); # Take the intersects file name. If $intersects_filenamew is a path, find the file name on the end.
+        my $sample_filename = $intersects_filename[-1];
+        
+        open ($SB_filehandle, '>', $SB_filename) or die "Could not open $SB_filename: $!\n"; # Open the file again, this time to overwrite.
         
         # Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
         my $timestamp_end = localtime();
-        print $S_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# ID\tName\tReads\n";
+        print $SB_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total reads: $total_reads\n#\n# ID\tName\tReads\n";
         
         foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any summary basic, this hash will be empty. But that shouldn't throw an error.
-            print $S_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
+            print $SB_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
         }
+        close $SB_filehandle;
+        
 } else {
     print "\nPIA finished, but no summary basic files found.\n\n";
+}
+
+
+# Re-format the summary reads file
+#---------------------------------
+if (-e $SR_filename) { # If there were any summary reads files,
+    open (my $SR_filehandle, $SR_filename) or die "Could not open $SR_filename for collapsing: $!\n"; # Read in the combined file.
+    my @SR_reformatted = ();
+    
+    foreach my $line (readline($SR_filehandle)) {
+            
+        if (index ($line, '#') != -1) {
+             next; # If the line contains a hash symbol, which indicates the header line, skip it.
+        } else {
+            push (@SR_reformatted, $line)
+        }
+    }
+    close $SR_filehandle;
+    my $total_reads = scalar (@SR_reformatted);
+    
+    my @intersects_filename = split ('/', $intersects_filename); # Take the intersects file name. If $intersects_filenamew is a path, find the file name on the end.
+    my $sample_filename = $intersects_filename[-1];
+    
+    open ($SR_filehandle, '>', $SR_filename) or die "Could not open $SR_filename: $!\n"; # Open the file again, this time to overwrite.
+        
+    # Print the same new header section as for the new summary basic file.
+    my $timestamp_end = localtime();
+    print $SR_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total reads: $total_reads\n#\n# Read\tID\tName\n";
+    
+    foreach my $line (@SR_reformatted) {
+        print $SR_filehandle $line;
+    }
+
+    close $SR_filehandle;
 }
 
 

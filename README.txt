@@ -2,8 +2,8 @@ Phylogenetic Intersection Analysis
 ==================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
-Version 5.1
-2020-02-27
+Version 5.2
+2020-03-05
 
 Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -57,7 +57,7 @@ Please report any problems to r.cribdon@warwick.ac.uk.
 Outputs
 -------
 Will be in [input FASTA].header_out/.
--   [FASTA].header_out.intersects.txt_Summary_Basic.txt: the main PIA output. Summarises any reads that passed both the quality and taxonomic diversity filters, excluding reads assigned to 'none' or 'root'. Reads are grouped by taxon for easy interpretation. The header states run parameters.
+-   [FASTA].header_out.intersects.txt_Summary_Basic.txt: the main PIA output. Summarises any reads that passed both the quality and taxonomic diversity filters, excluding reads assigned to 'none' or 'root'. Reads are grouped by taxon for easy interpretation. The header states run parameters and total read count.
 -   [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes BLAST hits that had trouble being identified. Lots of these suggest that you might want to update/synchronise your BLAST database and NCBI reference files.
 -   [FASTA].header_out.intersects.txt: lists information for each read that passed the initial quality filter. Apart from 'raw hit count' and 'taxonomic diversity', all hit information refers to the final list of processed hits.
    -   'Query': read name. From the FASTA and BLAST input files.
