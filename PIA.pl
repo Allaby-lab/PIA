@@ -6,10 +6,10 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 5.2, 2020-03-05 ###############
+############## Version 5.3, 2020-06-01 ###############
 ######################################################
 
-my $PIA_version = '5.2'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
+my $PIA_version = '5.3'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
 
 # Edited by Roselyn Ware, UoW 2018
 # Further edited by Becky Cribdon, UoW 2019
@@ -64,7 +64,7 @@ Optional
  	-c 	cap			Optional	Maximum unique BLAST taxa examined. Impacts taxonomic diversity score. Default is 100.
 	-C	min % coverage		Optional	Minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
 	-h	help			N		Print this help text.
-	-s	min diversity score	Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt. Depends on cap. Default is 0.1.
+	-s	min diversity score	Optional	Minimum taxonomic diversity score for a read to make it to Summary_Basic.txt and Summary_Reads.txt. Depends on cap. Default is 0.1.
 	-t	threads			Optional	PIA.pl only. Split the header file into x subfiles and run PIA_inner.pl on each one. Default is 1.
 ";
         exit;
@@ -120,7 +120,7 @@ open (my $fasta_filehandle, $fasta_filename) or die "Cannot open FASTA $fasta_fi
 
 $/ = '>'; # Set the input record separator to '>', the first character of a header line and of a FASTA record.
 while (1) { # Run this loop until "last" is called.
-    my $record = <$fasta_filehandle>; # Read the next line from the names file.
+    my $record = readline($fasta_filehandle); # Read the next line from the names file.
     if (! defined $record) { last }; # If there is no next line, exit the loop. You've processed the whole file. 
     
     my @record = split("\n", $record); # Split the record into its two lines.
@@ -144,7 +144,7 @@ $lines = "$lines[0]"; # Redefine $lines to be just the number of lines. This is 
 
 $lines = $lines/$threads; # Redefine $lines to be the number of headers to process per thread.
 $lines = $lines + 1; # Add 1. Does this ensure it's never 0-point-something?
-$lines=~ s/\.\d+$//; # $lines is probably now a decimal. Remove any "." characters followed by digits. So, $lines gains 1 but loses whatever fraction it had. It's rounded up to the nearest integer.
+$lines =~ s/\.\d+$//; # $lines is probably now a decimal. Remove any "." characters followed by digits. So, $lines gains 1 but loses whatever fraction it had. It's rounded up to the nearest integer.
 
 # Split the header file accordingly:
 system("split -a 3 -l $lines $header_filename $header_filename"); # Split the header file such that each new file has $lines lines. The new files will be named [header file].aaa, [header file].aab, [header file].aac...
@@ -155,16 +155,16 @@ my $splitfiles =`ls . | grep $header_filename.`; # "ls ." lists files and direct
 my @splitfiles= split /\n/, $splitfiles; # Save that list in @splitfiles.
 
 # Make the command file.
-my $shellscript = 'shellscript_' . $header_filename . '.txt';
-unless(open FILE, '>'."$shellscript") { die "\nUnable to create $shellscript\n"; }
+my $shellscript_filename = 'shellscript_' . $header_filename . '.txt';
+open (my $shellscript_filehandle, '>'."$shellscript_filename") or die "\nUnable to create $shellscript_filename: $!\n";
 
-foreach my $file (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.
-		print FILE "perl PIA_inner.pl -H $file -b $blast_filename -c $cap -C $min_coverage_perc -s $min_taxdiv_score &\n";
+foreach my $splitfile (@splitfiles){ # For each split header file, print to $shellscript the command to run the PIA_inner.pl file with the relevant options we checked earlier.
+	print $shellscript_filehandle "perl PIA_inner.pl -H $splitfile -b $blast_filename -c $cap -C $min_coverage_perc -s $min_taxdiv_score &\n";
 } # Ending in "&" means that the command is told to run in the background, so new commands can be started on top. The split header files will be processed alongside each other. That's threading.
 
-close FILE; # Close $shellscript. We're finished editing its contents.
-chmod 0755, "$shellscript"; # But still need to change the permissions.
-`./$shellscript `; # Finally, run it.
+close $shellscript_filehandle; # Close the shellscript file. We're finished editing its contents.
+chmod 0755, "$shellscript_filename"; # But still need to change the permissions.
+`./$shellscript_filename `; # Finally, run it.
 
 
 # Concatenate the PIA_inner.pl outputs from each thread
@@ -197,11 +197,12 @@ mkdir "$header_filename"."_out"; # Make a master output folder to collect all ou
 my $intersects_filename = $header_filename."_out/".$header_filename."_out.intersects.txt"; # So, $OI represents a collated, master out.intersects file inside the output folder. Note that this and $S get "out." because they are more of an output than the log.
 my $SB_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Basic.txt";
 my $SR_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Reads.txt";
+my $SRM_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Reads_MEGAN.csv";
 my $log_filename = $header_filename."_out/".$header_filename."_PIA_inner_logs.txt";
 
 foreach my $data_file (@outIntersects) {
 	chomp $data_file;
-	`cat $data_file >>$intersects_filename`;
+	`cat $data_file >> $intersects_filename`;
 }
 foreach my $data_file (@outBasics) {
 	chomp($data_file);
@@ -217,17 +218,16 @@ foreach my $data_file (@logs) {
 }
 
 
-# Collapse duplicates in the summary basic file
+# Collapse duplicates in the Summary Basic file
 #----------------------------------------------
-if (-e $SB_filename) { # If there were actually any summary basics to start with.
+if (-e $SB_filename) { # If there were actually any Summary Basics to start with.
         open (my $SB_filehandle, $SB_filename) or die "Could not open $SB_filename for collapsing: $!\n"; # Read in the combined file.
         my %taxa_and_hits = ();
-        foreach my $line (readline($SB_filehandle)) {
-            
-            if (index ($line, '#') != -1) {
-                next; # If the line contains a hash symbol, which indicates the header line, skip it.
-            }
-            
+        while (1) { # Run this loop until last is called.
+            my $line = readline($SB_filehandle);
+            if (! defined $line) { last; } # If you've reached the end of the file, exit the loop.   
+            if (index ($line, '#') != -1) { next; } # If the line contains a hash symbol, which indicates the header line, skip it.
+ 
             chomp $line;
             my @line = split("\t", $line);
         
@@ -253,25 +253,27 @@ if (-e $SB_filename) { # If there were actually any summary basics to start with
         
         # Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
         my $timestamp_end = localtime();
-        print $SB_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total reads: $total_reads\n#\n# ID\tName\tReads\n";
+        print $SB_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total passed reads: $total_reads\n#\n# ID\tName\tReads\n";
         
-        foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any summary basic, this hash will be empty. But that shouldn't throw an error.
+        foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any Summary Basic, this hash will be empty. But that shouldn't throw an error.
             print $SB_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
         }
         close $SB_filehandle;
         
 } else {
-    print "\nPIA finished, but no summary basic files found.\n\n";
+    print "\nPIA finished, but no Summary Basic files found.\n\n";
 }
 
 
-# Re-format the summary reads file
+# Re-format the Summary Reads file
 #---------------------------------
-if (-e $SR_filename) { # If there were any summary reads files,
+if (-e $SR_filename) { # If there were any Summary Reads files,
     open (my $SR_filehandle, $SR_filename) or die "Could not open $SR_filename for collapsing: $!\n"; # Read in the combined file.
     my @SR_reformatted = ();
     
-    foreach my $line (readline($SR_filehandle)) {
+    while(1) {
+        my $line = readline($SR_filehandle);
+        if (! defined $line) { last; }
             
         if (index ($line, '#') != -1) {
              next; # If the line contains a hash symbol, which indicates the header line, skip it.
@@ -287,9 +289,9 @@ if (-e $SR_filename) { # If there were any summary reads files,
     
     open ($SR_filehandle, '>', $SR_filename) or die "Could not open $SR_filename: $!\n"; # Open the file again, this time to overwrite.
         
-    # Print the same new header section as for the new summary basic file.
+    # Print the same new header section as for the new Summary Basic file.
     my $timestamp_end = localtime();
-    print $SR_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total reads: $total_reads\n#\n# Read\tID\tName\n";
+    print $SR_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total passed reads: $total_reads\n#\n# Read\tID\tName\n";
     
     foreach my $line (@SR_reformatted) {
         print $SR_filehandle $line;
@@ -311,7 +313,7 @@ foreach my $file (@splitfiles2){
 	unlink $file or warn "Could not unlink $file: $!"; # Delete the other temporary outputs too.
 }
 
-unlink $shellscript; # Delete the list of PIA_inner.pl commands.
+unlink $shellscript_filename; # Delete the list of PIA_inner.pl commands.
 unlink $header_filename; # Delete the original header file.
 
 exit;

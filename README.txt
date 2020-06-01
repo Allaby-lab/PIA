@@ -2,8 +2,8 @@ Phylogenetic Intersection Analysis
 ==================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
-Version 5.2
-2020-05-22
+Version 5.3
+2020-06-01
 
 Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -71,12 +71,13 @@ Will be in [input FASTA].header_out/.
    -   'phylogenetic range': phylogenetic intersection of the top and last hits. For interest only.
    -   'raw hit count': how many hits were in the BLAST file. For interest only.
    -   'taxonomic diversity (up to cap if met)': number of taxa in the BLAST file, or cap if met. Equal to the number of hits analysed because it's one hit per taxon. Used to calculate taxonomic diversity score.
-   -   'taxonomic diversity score': (taxonomic diversity / cap) - (1/cap). Must be above a threshold (default 0.1) for a read to make it to the summary basic.
+   -   'taxonomic diversity score': (taxonomic diversity / cap) - (1/cap). Must be above a threshold (default 0.1) for a read to make it to the Summary Basic and Summary Reads.
    -   'classification intersect': phylogenetic intersection of the top and next hits. This is what the read is assigned to.
 
 
 Known issues
 ------------
+-   PIA must be in the same directory as the input files.
 -   If you run PIA.pl with multiple threads, each thread makes a copy of the DBM index files to avoid conflict. These files can be big, so watch your memory usage.
 -   BLAST hits are identified using their taxonomic ID. These IDs apparently change sometimes. If your BLAST database and NCBI reference files are not well synchronised (e.g. one dates from years ago and the other from yesterday), the PIA may not be able to calculate intersections as accurately and hits may be unfairly excluded.
 -   If you have to interrupt a run, delete any output. It may confuse future runs.

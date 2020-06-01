@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 5.2, 2020-03-05 ###############
+############## Version 5.3, 2020-06-01 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -135,10 +135,10 @@ Optional
 
 ##### Extract simple summary from the intersects file
 	my $intersects_filename = "$corename"."/"."$corename.intersects.txt";
-	my $summary_basic_filename = simple_summary($intersects_filename, $min_taxdiv_score);
+	my $summary_basic_filename = summary_basic($intersects_filename, $min_taxdiv_score);
     
 ##### Extract read-by-read summary from the intersects file
-    my $summary_reads_filename = reads_summary($intersects_filename, $min_taxdiv_score);
+    my $summary_reads_filename = summary_reads($intersects_filename, $min_taxdiv_score);
 
 
 ######################################################
@@ -208,7 +208,7 @@ sub PIA {
     #       First, finish processing the hits from the last header.
     #           Collapse multiple hits with the same E value to their intersection. So, in the end there's just one hit per E value.
     #           If a new "hits" is to an existing taxon, discard all but the hit with the highest E value.
-    #           Calculate the taxonomic diversity score. This affects which reads make it to the summary basic.
+    #           Calculate the taxonomic diversity score. This affects which reads make it to the Summary Basic and Summary Reads files.
     #           Find the intersection between the top and second-top hits. This is the taxon the read is assigned to.
     #           Find the intersection between the top and bottom hits. This is just for interest.
     #           Output all information for this header to the intersects file.
@@ -591,7 +591,7 @@ sub retrieve_taxonomic_structure {
 }
 
 
-sub simple_summary {
+sub summary_basic {
 #### Create simple summary of output. The intersects file is more informative, but this is what most people will take as the output.
 	my ($intersects_filename, $min_taxdiv_score) = @_;
     
@@ -601,7 +601,7 @@ sub simple_summary {
         return 'none';
     }
     
-	open (my $intersects_filehandle, $intersects_filename) or die "Cannot open intersects file for generating summary basic: $!\n";			
+	open (my $intersects_filehandle, $intersects_filename) or die "Cannot open intersects file for generating Summary Basic: $!\n";			
 	my %intersects = (); # Keys are intersect names and IDs in the format "name (ID)". Values are the number of times that name (ID) occurs.
     
     # Get a list of classification intersects where the taxa diversity score was at least $min_taxdiv_score.
@@ -650,7 +650,7 @@ sub simple_summary {
 }
 
 
-sub reads_summary {
+sub summary_reads {
 #### Create read-by-read summary of output. This lists the names of reads that passed and what taxon each one was assigned to.
 	my ($intersects_filename, $min_taxdiv_score) = @_;
     
