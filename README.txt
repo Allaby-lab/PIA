@@ -60,7 +60,7 @@ Will be in [input FASTA].header_out/.
 -   [FASTA].header_out.intersects.txt_Summary_Basic.txt: the main PIA output. Summarises any reads that passed both the quality and taxonomic diversity filters, excluding reads assigned to 'none' or 'root'. Reads are grouped by taxon for easy interpretation. The header states run parameters and total read count.
 -   [FASTA].header_out.intersects.txt_Summary_Reads.txt: lists the reads in the Summary Basic and which taxa they were assigned to.
 -   [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes BLAST hits that had trouble being identified. Lots of these suggest that you might want to update/synchronise your BLAST database and NCBI reference files.
--   [FASTA].header_out.intersects.txt: lists information for each read that passed the initial quality filter. Apart from 'raw hit count' and 'taxonomic diversity', all hit information refers to the final list of processed hits.
+-   [FASTA].header_out.intersects.txt: lists information for each read that passed the initial quality filter. It is an intermediate file that may include reads that did NOT pass the taxonomic diversity filter and should be used for investigating problems, not as a final output. Apart from 'raw hit count' and 'taxonomic diversity', all hit information refers to the final list of processed hits.
    -   'Query': read name. From the FASTA and BLAST input files.
    -   'top hit': taxon name and ID of the top hit. Used to calculate classification intersect and phylogenetic range.
    -   'expect': expect (E) value of the top hit. For interest only.
