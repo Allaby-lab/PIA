@@ -1,0 +1,12 @@
+# Start: Wed Mar 10 14:31:49 2021	End: Wed Mar 10 14:31:49 2021
+# PIA version:	5.4
+# Input FASTA:	test0.fasta
+# Input BLAST:	test0.blast.txt
+# Minimum coverage for top BLAST hit:	95 %
+# Cap of BLAST taxa to examine:		100
+# Minimum taxonomic diversity score:	0.1
+# Number of threads:	1
+#
+# Total passed reads: 0
+#
+# Read	ID	Name
