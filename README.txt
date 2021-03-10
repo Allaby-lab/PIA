@@ -2,14 +2,16 @@ Phylogenetic Intersection Analysis
 ==================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
-Version 5.3
-2020-06-01
+Version 5.4
+2021-03-10
 
 Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
 A very early version was published in Smith et al. ("Sedimentary DNA from a submerged site reveals wheat in the British Isles 8000 years ago.", Science, 2015) and revised version in Cribdon et al. (PIA: More Accurate Taxonomic Assignment of Metagenomic Data Demonstrated on sedaDNA From the North Sea, Frontiers in Ecology and Evolution, 2020).
 
-Please email r.cribdon@warwick.ac.uk with any questions, problems, or suggestions. Thanks for using PIA!
+Test FASTAs, their corresponding BLAST files, and PIA output directories are included.
+
+Please email r.g.allaby@warwick.ac.uk with any questions, problems, or suggestions. Thanks for using PIA!
 
 
 Prerequisites
@@ -59,6 +61,8 @@ Outputs
 Will be in [input FASTA].header_out/.
 -   [FASTA].header_out.intersects.txt_Summary_Basic.txt: the main PIA output. Summarises any reads that passed both the quality and taxonomic diversity filters, excluding reads assigned to 'none' or 'root'. Reads are grouped by taxon for easy interpretation. The header states run parameters and total read count.
 -   [FASTA].header_out.intersects.txt_Summary_Reads.txt: lists the reads in the Summary Basic and which taxa they were assigned to.
+-   [FASTA].header_out.intersects.txt_Summary_Reads_MEGAN.csv: same information as the Summary Reads file, but in a CSV format that MEGAN can read. See "How to open Summary_Reads_MEGAN.csv files in MEGAN" below.
+-   [FASTA].header_out.intersects.fasta: a subset of the input FASTA containing only reads that passed PIA. Each read name has "_IDx" appended, where x is the taxonomic ID the read was assigned to.
 -   [FASTA].header_PIA_inner_logs.txt: collected logs from PIA_inner.pl. Notes BLAST hits that had trouble being identified. Lots of these suggest that you might want to update/synchronise your BLAST database and NCBI reference files.
 -   [FASTA].header_out.intersects.txt: lists information for each read that passed the initial quality filter. It is an intermediate file that may include reads that did NOT pass the taxonomic diversity filter and should be used for investigating problems, not as a final output. Apart from 'raw hit count' and 'taxonomic diversity', all hit information refers to the final list of processed hits.
    -   'Query': read name. From the FASTA and BLAST input files.
@@ -73,6 +77,17 @@ Will be in [input FASTA].header_out/.
    -   'taxonomic diversity (up to cap if met)': number of taxa in the BLAST file, or cap if met. Equal to the number of hits analysed because it's one hit per taxon. Used to calculate taxonomic diversity score.
    -   'taxonomic diversity score': (taxonomic diversity / cap) - (1/cap). Must be above a threshold (default 0.1) for a read to make it to the Summary Basic and Summary Reads.
    -   'classification intersect': phylogenetic intersection of the top and next hits. This is what the read is assigned to.
+
+
+How to open Summary_Reads_MEGAN.csv files in MEGAN
+--------------------------------------------------
+The CSVs contain each read name, its taxonomic ID, and a stand-in bitscore of 50 (the default minimum pass score for MEGAN's LCA).
+
+To open a CSV in MEGAN, go to go to "File -> Import -> Text (CSV) Format...". Keep the default format (Read Class) and separator (Comma). Tick the classification "Taxonomy" and, if available, tick "Parse accessions ids" and accept the default taxonomy analysis settings.
+
+MEGAN will then try to run the LCA. To turn the LCA off, keep the min score at 50, change top percent to 0.001, change min support percent to 0, and keep min support at 1.
+
+Remember to uncollapse the tree to view it fully.
 
 
 Known issues
