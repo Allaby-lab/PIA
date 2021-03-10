@@ -1,0 +1,37 @@
+# Start: Wed Mar 10 14:31:37 2021	End: Wed Mar 10 14:31:42 2021
+# PIA version:	5.4
+# Input FASTA:	test2.fasta
+# Input BLAST:	test2.blast.txt
+# Minimum coverage for top BLAST hit:	95 %
+# Cap of BLAST taxa to examine:		100
+# Minimum taxonomic diversity score:	0.1
+# Number of threads:	1
+#
+# Total passed reads: 90
+#
+# ID	Name	Reads
+359160	BOP clade	1
+131567	cellular organisms	3
+147429	Andropogoneae	1
+75966	Trebouxiophyceae	2
+3268	Polypodiales	1
+238069	Saliceae	1
+4479	Poaceae	7
+3166	Chlorophyceae	2
+4447	Liliopsida	3
+3646	Malpighiales	1
+38820	Poales	2
+3398	Magnoliopsida	3
+147389	Triticeae	1
+91835	fabids	1
+1437183	Mesangiospermae	29
+147370	PACMAD clade	4
+33090	Viridiplantae	1
+16360	Alismatales	4
+1437201	Pentapetalae	2
+40685	Salix	3
+35461	Chlorellaceae	1
+3041	Chlorophyta	8
+58023	Tracheophyta	1
+2759	Eukaryota	7
+3688	Salicaceae	1
