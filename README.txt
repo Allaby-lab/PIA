@@ -9,7 +9,7 @@ Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and 
 
 A very early version was published in Smith et al. ("Sedimentary DNA from a submerged site reveals wheat in the British Isles 8000 years ago.", Science, 2015) and revised version in Cribdon et al. (PIA: More Accurate Taxonomic Assignment of Metagenomic Data Demonstrated on sedaDNA From the North Sea, Frontiers in Ecology and Evolution, 2020).
 
-Test FASTAs, their corresponding BLAST files, and PIA output directories are included.
+Test FASTAs, their corresponding BLAST files, and expected PIA output directories are included.
 
 Please email r.g.allaby@warwick.ac.uk with any questions, problems, or suggestions. Thanks for using PIA!
 
