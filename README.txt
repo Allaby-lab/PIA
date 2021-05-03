@@ -2,8 +2,8 @@ Phylogenetic Intersection Analysis
 ==================================
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
-Version 5.4
-2021-03-10
+Version 5.5
+2021-05-03
 
 Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -50,7 +50,7 @@ Usage
 ------
 -   Run PIA_index_maker.pl:
     >perl PIA_index_maker.pl
-    This generates DBM index files for names.dmp and nodes.dmp. It will take a few minutes. You will need to make new index files if you change the .dmp files or if you want to run the PIA on a new machine. The index files do not transfer between machines (something to do with DB_File).
+    This generates DBM index files for names.dmp and nodes.dmp. It will take a few minutes. You will need to make new index files if you update the .dmp files (do this when you update the BLAST database) or if you want to run the PIA on a new machine. The index files do not transfer between machines (something to do with DB_File).
 -   PIA_inner.pl does the analysis. PIA.pl is a wrapper that allows threading. To run PIA.pl:
     >perl PIA.pl -f [input FASTA] -b [input BLAST file] -t [number of threads] [optional options for advanced users]
     While PIA.pl is running, each thread will generate a PIA_inner.log.txt. Look at that file to see how far the thread has progressed through its list of sequences.
