@@ -123,10 +123,6 @@ Optional
 ######################################################
 	
 	my $corename = PIA($header_filename, $blast_filename, $cap, $min_coverage_perc); # PIA() returns a base name for this sample file. The base name is [header file]_out.
-	#print "\nPIA() subroutine finished.\n\n";
-    #print $log_filehandle "\nPIA() subroutine finished.\n\n";
-    
-	#my $corename = '50.header_out'; # IF NOT ACTUALLY RUNNING THE PIA; FOR TESTING
 
 
 ######################################################	
