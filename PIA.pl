@@ -6,13 +6,13 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 5.3, 2020-06-01 ###############
+############## Version 5.5, 2021-05-03 ###############
 ######################################################
 
-my $PIA_version = '5.3'; # String instead of numeric because otherwise it can 'helpfully' remove '.0'.
+my $PIA_version = '5.5'; # String instead of numeric because otherwise perl can 'helpfully' remove '.0'.
 
 # Edited by Roselyn Ware, UoW 2018
-# Further edited by Becky Cribdon, UoW 2019
+# Further edited by Becky Cribdon, UoW 2021
 		
 # A method of metagenomic phylogenetic assignation, designed to be robust to partial representation of organisms in the database		
 # Please report any problems to r.cribdon@warwick.ac.uk.
@@ -83,7 +83,7 @@ Optional
 	if ($options{c}) { # If there is an option, overwrite the default.
         $cap = $options{c};
     }
-    print "\nMax taxa to consider: $cap\n";
+    print "\nMax taxa to consider per read: $cap\n";
 
 ##### See if min % coverage input #####
 	# The minimum percentage coverage a top BLAST hit must have for a read to be taken forward. Default is 95.
@@ -151,7 +151,8 @@ system("split -a 3 -l $lines $header_filename $header_filename"); # Split the he
 my @header_filename_elements = split/\//, $header_filename; # Split $header_filename on "/" symbols in case it's not actually a filename, but a path.
 $header_filename = pop @header_filename_elements; # Redefine $header_filename as the final element, so the actual filename if $header_filename is a path. If it isn't a path, $header_filename stays the same.
 
-my $splitfiles =`ls . | grep $header_filename.`; # "ls ." lists files and directories in the current directory. The grep narrows this list to files and directories starting with the header filename. It ends up being a list of the split header files.
+my $grep_search_expression = '^' . $header_filename . '[a-z]{3}$';
+my $splitfiles = `ls . | grep -E $grep_search_expression`; # "ls ." lists files and directories in the current directory. The grep -E narrows this list to files and directories starting with the header filename, then three lower-case letters. It ends up being a list of the split header files.
 my @splitfiles= split /\n/, $splitfiles; # Save that list in @splitfiles.
 
 # Make the command file.
@@ -163,15 +164,13 @@ foreach my $splitfile (@splitfiles){ # For each split header file, print to $she
 } # Ending in "&" means that the command is told to run in the background, so new commands can be started on top. The split header files will be processed alongside each other. That's threading.
 
 close $shellscript_filehandle; # Close the shellscript file. We're finished editing its contents.
-chmod 0755, "$shellscript_filename"; # But still need to change the permissions.
-`./$shellscript_filename `; # Finally, run it.
+`bash $shellscript_filename`; # Run it.
 
 
 # Concatenate the PIA_inner.pl outputs from each thread
 #------------------------------------------------------
-my @splitfiles2 = `ls . | grep $header_filename... | grep -v "out" `; # -v means "invert". This line searches for files or directories starting with $tophitfile but that don't contain "out". The items are separated by newlines.
-
-my @splitfolders = `ls . | grep $header_filename... | grep "out" `; # This searches for files or directories starting with $tophitfile that do contain "out". These will be directories that PIA_inner.pl has just made, such as test.headeraaa_out/. The items are separated by newlines.
+$grep_search_expression = '^' . $header_filename . '[a-z]{3}_out$'; # Add '_out' to pick up only the output directories from each split header file.
+my @splitfolders = `ls . | grep -E $grep_search_expression `;
 
 my @outIntersects;
 my @outBasics;
@@ -193,11 +192,12 @@ foreach my $splitfolder (@splitfolders){ # For every directory that PIA_inner.pl
 
 mkdir "$header_filename"."_out"; # Make a master output folder to collect all output in.
 
-# Now make a variable for the filename of each of these PIA_inner.pl output files we've just looked at.
-my $intersects_filename = $header_filename."_out/".$header_filename."_out.intersects.txt"; # So, $OI represents a collated, master out.intersects file inside the output folder. Note that this and $S get "out." because they are more of an output than the log.
+# Now make a variable for the filename of each of the PIA_inner.pl output files.
+my $intersects_filename = $header_filename."_out/".$header_filename."_out.intersects.txt";
 my $SB_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Basic.txt";
 my $SR_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Reads.txt";
-my $SRM_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Reads_MEGAN.csv";
+my $SRM_filename = $header_filename."_out/".$header_filename."_out.intersects.txt_Summary_Reads_MEGAN.csv"; # To be filled in later.
+my $output_fasta_filename = $header_filename."_out/".$header_filename."_out.intersects.fasta"; # To be filled in later.
 my $log_filename = $header_filename."_out/".$header_filename."_PIA_inner_logs.txt";
 
 foreach my $data_file (@outIntersects) {
@@ -221,55 +221,56 @@ foreach my $data_file (@logs) {
 # Collapse duplicates in the Summary Basic file
 #----------------------------------------------
 if (-e $SB_filename) { # If there were actually any Summary Basics to start with.
-        open (my $SB_filehandle, $SB_filename) or die "Could not open $SB_filename for collapsing: $!\n"; # Read in the combined file.
-        my %taxa_and_hits = ();
-        while (1) { # Run this loop until last is called.
-            my $line = readline($SB_filehandle);
-            if (! defined $line) { last; } # If you've reached the end of the file, exit the loop.   
-            if (index ($line, '#') != -1) { next; } # If the line contains a hash symbol, which indicates the header line, skip it.
- 
-            chomp $line;
-            my @line = split("\t", $line);
-        
-            my $ID_and_name = $line[0] . "\t" . $line[1]; # The first two columns are ID and name.
-            my $hit_count = $line[2]; # The final column is count.
-            if (exists $taxa_and_hits{$ID_and_name}) {
-                $taxa_and_hits{$ID_and_name} = $taxa_and_hits{$ID_and_name} + $hit_count;
-            } else {
-                $taxa_and_hits{$ID_and_name} = $hit_count;
-            }
+    open (my $SB_filehandle, $SB_filename) or die "Could not open $SB_filename for collapsing: $!\n"; # Read in the combined file.
+    my %taxa_and_hits = ();
+    
+    while (1) { # Run this loop until last is called.
+        my $line = readline($SB_filehandle);
+        if (! defined $line) { last; } # If you've reached the end of the file, exit the loop.   
+        if (index ($line, '#') != -1) { next; } # If the line contains a hash symbol, which indicates the header line, skip it.
+
+        chomp $line;
+        my @line = split("\t", $line);
+    
+        my $ID_and_name = $line[0] . "\t" . $line[1]; # The first two columns are ID and name.
+        my $hit_count = $line[2]; # The final column is count.
+        if (exists $taxa_and_hits{$ID_and_name}) {
+            $taxa_and_hits{$ID_and_name} = $taxa_and_hits{$ID_and_name} + $hit_count;
+        } else {
+            $taxa_and_hits{$ID_and_name} = $hit_count;
         }
-        close $SB_filehandle;
-        
-        my $total_reads = 0;
-        foreach my $ID_and_name (keys %taxa_and_hits) {
-            $total_reads = $total_reads + $taxa_and_hits{$ID_and_name};
-        }
-        
-        my @intersects_filename = split ('/', $intersects_filename); # Take the intersects file name. If $intersects_filenamew is a path, find the file name on the end.
-        my $sample_filename = $intersects_filename[-1];
-        
-        open ($SB_filehandle, '>', $SB_filename) or die "Could not open $SB_filename: $!\n"; # Open the file again, this time to overwrite.
-        
-        # Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
-        my $timestamp_end = localtime();
-        print $SB_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total passed reads: $total_reads\n#\n# ID\tName\tReads\n";
-        
-        foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any Summary Basic, this hash will be empty. But that shouldn't throw an error.
-            print $SB_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
-        }
-        close $SB_filehandle;
+    }
+    close $SB_filehandle;
+    
+    my $total_reads = 0;
+    foreach my $ID_and_name (keys %taxa_and_hits) {
+        $total_reads = $total_reads + $taxa_and_hits{$ID_and_name};
+    }
+    
+    my @intersects_filename = split ('/', $intersects_filename); # Take the intersects file name. If $intersects_filenamew is a path, find the file name on the end.
+    my $sample_filename = $intersects_filename[-1];
+    
+    open ($SB_filehandle, '>', $SB_filename) or die "Could not open $SB_filename: $!\n"; # Open the file again, this time to overwrite.
+    
+    # Print a new header section including the end time. Preface every new line with '#' to make ignoring them easier.
+    my $timestamp_end = localtime();
+    print $SB_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total passed reads: $total_reads\n#\n# ID\tName\tReads\n";
+    
+    foreach my $taxon (keys %taxa_and_hits) { # If there weren't any hits in any Summary Basic, this hash will be empty. But that shouldn't throw an error.
+        print $SB_filehandle "$taxon\t$taxa_and_hits{$taxon}\n";
+    }
+    close $SB_filehandle;
         
 } else {
     print "\nPIA finished, but no Summary Basic files found.\n\n";
 }
 
 
-# Re-format the Summary Reads file
-#---------------------------------
+# Re-format the Summary Reads file and generate from it a CSV that MEGAN can read
+#--------------------------------------------------------------------------------
+my @SR_reformatted = ();
 if (-e $SR_filename) { # If there were any Summary Reads files,
     open (my $SR_filehandle, $SR_filename) or die "Could not open $SR_filename for collapsing: $!\n"; # Read in the combined file.
-    my @SR_reformatted = ();
     
     while(1) {
         my $line = readline($SR_filehandle);
@@ -293,25 +294,67 @@ if (-e $SR_filename) { # If there were any Summary Reads files,
     my $timestamp_end = localtime();
     print $SR_filehandle "# Start: $timestamp_start\tEnd: $timestamp_end\n# PIA version:\t$PIA_version\n# Input FASTA:\t$fasta_filename\n# Input BLAST:\t$blast_filename\n# Minimum coverage for top BLAST hit:\t$min_coverage_perc %\n# Cap of BLAST taxa to examine:\t\t$cap\n# Minimum taxonomic diversity score:\t$min_taxdiv_score\n# Number of threads:\t$threads\n#\n# Total passed reads: $total_reads\n#\n# Read\tID\tName\n";
     
+    # Then print the rest of the data.
     foreach my $line (@SR_reformatted) {
         print $SR_filehandle $line;
     }
-
     close $SR_filehandle;
+    
+    # Print in a different format to the MEGAN CSV.
+    open (my $SRM_filehandle, '>', $SRM_filename) or die "Could not open $SRM_filename: $!\n"; # Open the MEGAN CSV.
+    foreach my $line (@SR_reformatted) {
+        my @line = split("\t", $line); # Split the line on tabs.
+        print $SRM_filehandle "$line[0],$line[1],50\n" # Export the read name, ID, and a stand-in bitscore of 50 (the default minimum pass score for the LCA).
+    }
+    close $SRM_filehandle;    
 }
+
+
+# Use the Summary Reads data to produce a post-PIA FASTA
+#-------------------------------------------------------
+# Convert the Summary Reads data into a hash for easier lookup.
+my %SR_data = (); # Keys are read names, values are taxonomic IDs.
+foreach my $SR_line (@SR_reformatted) {
+    my @SR_line = split("\t", $SR_line);
+    $SR_data{$SR_line[0]} = $SR_line[1];
+}
+
+# Filter the input FASTA.
+open($fasta_filehandle, $fasta_filename) or die "Could not open original FASTA file $fasta_filename: $!\n";
+open(my $output_fasta_filehandle, '>', $output_fasta_filename) or die "Could not open post-PIA FASTA file $output_fasta_filename: $!\n";
+
+$/ = '>'; # Set the record separator to '>', which separates FASTA records.
+
+while (1) { # Run this loop until "last" is called.
+    my $record = readline($fasta_filehandle);
+    if (! defined $record) { last }; # If there is no next record, exit the loop. You've processed the whole file.
+    
+    my @record = split ("\n", $record); # Split the record into lines.
+    my $read_name = $record[0];
+    if (exists $SR_data{$read_name} ) {
+        $read_name = $read_name . '_ID' . $SR_data{$read_name}; # Add the taxonomic ID on the end of the read name.
+        $record = join("\n", $read_name, $record[1]); # Slot the new name back into the record.
+        $record =~ s/>//g; # Remove the '>' character off the end so we can add a new one on the front.
+        print $output_fasta_filehandle ">$record\n";
+    }
+}
+
+$/ = "\n"; # Set the record separator back to default.
 
 
 # Tidy up
 #--------
-foreach my $file (@splitfolders){ # For every directory that PIA_inner.pl made,
-	chomp $file;
-	rmtree $file or warn "Could not rmtree $file: $!"; # Delete it and any subdirectories.
+foreach my $directory (@splitfolders){ # Delete the split output directories.
+	chomp $directory;
+	rmtree $directory or warn "Could not rmtree $directory: $!";
 }
 
-foreach my $file (@splitfiles2){
+foreach my $file (@splitfiles){
 	chomp $file;
-	unlink $file or warn "Could not unlink $file: $!"; # Delete the other temporary outputs too.
+	unlink $file or warn "Could not unlink $file: $!"; # Delete the split header files.
 }
+
+if (-z $output_fasta_filename) { unlink $output_fasta_filename }; # If the input FASTA was empty, the only output file made will be an empty output FASTA. Delete it if it is empty.
 
 unlink $shellscript_filename; # Delete the list of PIA_inner.pl commands.
 unlink $header_filename; # Delete the original header file.
