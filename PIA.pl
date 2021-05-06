@@ -371,8 +371,6 @@ foreach my $split_read_info_filepath (@split_read_infos) { # Delete the split re
 	unlink $split_read_info_filepath or warn "Could not unlink $split_read_info_filepath: $!";
 }
 
-if (-z $output_fasta_filepath) { unlink $output_fasta_filepath }; # If the input FASTA was empty, the only output file made will be an empty output FASTA. Delete it if it is empty.
-
 unlink $shellscript_filename; # Delete the list of PIA_inner.pl commands.
 unlink $read_info_filepath; # Delete the original read_info file.
 
