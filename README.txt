@@ -3,7 +3,7 @@ Phylogenetic Intersection Analysis
 Metagenomic phylogenetic assignment of mixed environmental assemblages
 Allaby lab, University of Warwick
 Version 5.6
-2021-05-06
+2021-05-07
 
 Phylogenetic intersection analysis (PIA) takes standard-format BLAST output and a corresponding FASTA file. It assigns reads to phylogenetic intersections based on their BLAST hits, assuming that the true taxon will be inside that phylogenetic intersection. It is designed to be robust to the uneven representation of taxa in databases.
 
@@ -35,8 +35,7 @@ Setting up PIA
 -   PIA requires names.dmp and nodes.dmp from the NCBI taxdump. These should be from a similar date as your BLAST database to maximise compatibility (e.g. taxa are added and taxonomic IDs can change over time).
 -   To download the files, go to https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/ and download taxdump.tar.gz. Uncompress.
 -   Move your names.dmp and nodes.dmp to Reference_files/.
--   Have all PIA files and directories in the same directory (see tree below).
--   Input FASTAs and BLAST files can be in other directories.
+-   Have all PIA files and directories in the same directory (see tree below). Input FASTAs and BLAST files can be in other directories.
 -   Note that you should be able to run PIA on multiple FASTA files in the same directory simultaneously, but this has not been thoroughly tested.
 
 Reference_files/
@@ -50,6 +49,10 @@ PIA_inner.pl
 Before running PIA, use PIA_index_maker.pl to build DBM index files from names.dmp and nodes.dmp:
 >perl PIA_index_maker.pl
 This will take a few minutes. You will need to make new index files if you update the .dmp files (do this when you update the BLAST database) or if you want to run the PIA on a new machine. The index files do not transfer between machines (something to do with the DB_File module).
+
+If you get an error like this:
+"Cannot open Reference_files/nodes.dmp.dbm_test0.fasta.read_infoaaa: Inappropriate file type or format"
+Try making DBM files on your current machine.
 
 
 Running PIA
@@ -88,8 +91,6 @@ Note that output files will be produced even if the input FASTA was empty.
 -   [input].Summary_Reads.txt: Lists reads that passed PIA and which taxa they were assigned to.
 
 -   [input].Summary_Reads_MEGAN.csv: Same information as the Summary Reads file, but in a CSV format that MEGAN can read. See "How to open Summary_Reads_MEGAN.csv files in MEGAN" below.
-
-
 
 
 How to open Summary_Reads_MEGAN.csv files in MEGAN

@@ -6,7 +6,7 @@
 #########  Phylogenetic Intersection Analysis ########
 ############## Robin Allaby, UoW 2013 ################
 ######################################################
-############## Version 5.6, 2021-05-06 ###############
+############## Version 5.6, 2021-05-07 ###############
 ######################################################
 
 # Edited by Roselyn Ware, UoW 2015
@@ -83,6 +83,16 @@ Optional
         $blast_filepath = $options{b};
     } else {
         print "\nSpecify a BLAST file with -b.\n\n";
+        exit;
+    }
+
+##### Check names.dmp.dbm and nodes.dmp.dbm file paths #####
+    unless (-e 'Reference_files/names.dmp.dbm') {
+        print "\nCannot find names DBM at Reference_files/names.dmp.dbm. You may need to run PIA_index_maker.pl.\n\n";
+        exit;
+    }
+    unless (-e 'Reference_files/nodes.dmp.dbm') {
+        print "\nCannot find nodes DBM at Reference_files/nodes.dmp.dbm. You may need to run PIA_index_maker.pl.\n\n";
         exit;
     }
 
@@ -177,7 +187,7 @@ Optional
 sub find_taxonomic_intersect {
 ##### Find intersection of two taxa by comparing their routes down the phlyogenetic tree
 	my ($first_route, $second_route) = @_; # Routes are the taxonomic IDs of successive parent taxa.
-	my $intersect_ID = 0; # If either the first or second route aren't defined, return the intersect ID 0.
+	my $intersect_ID = 0; # If either the first or second route aren't defined, return the intersect ID 0 (null).
 	if (defined $first_route && defined $second_route){
 		my @first_route = split (/\t/, $first_route);
 		my @second_route = split (/\t/, $second_route);
@@ -234,7 +244,7 @@ sub PIA {
     
     mkdir $output_directory_path;
     my $main_output_filepath = $output_directory_path . '/' . $read_info_filename . '.Full.txt'; # This main output file will list information for reads that pass the coverage check.
-    
+  
     
 	# Retrieve the name and sequence length for each read
 	#----------------------------------------------------
@@ -363,7 +373,7 @@ sub PIA {
                 #print "\t\tNumber of taxa used to calculate taxdiv score: $taxonomic_diversity\n";
                 my $tax_diversity_score = ($taxonomic_diversity/$cap) - (1/$cap); # Remember, $cap defaults to 100.
                 
-                my $contrastinghit_ID = 'NA'; my $contrastinghit_name = 'NA'; # contrastinghit is second BLAST hit: number 1 if you're counting from 0. Default the values to null.
+                my $contrastinghit_ID = 0; my $contrastinghit_name = 'NA'; # contrastinghit is second BLAST hit: number 1 if you're counting from 0. Default the values to null.
                 
                 if ($number_of_finished_blast_hits > 1) { # If there is more than one finished hit:
                         my @contrastinghit_info = split ("\t", $all_hit_info[1]);
@@ -378,24 +388,27 @@ sub PIA {
                 # Find the intersection between the top and contrasting hits
                 #-----------------------------------------------------------
                 # This is the taxon the read will be assigned to.
-                my $intersect_ID = 'NA'; my $intersect_name = 'NA'; my $tophit_ID = 'NA'; my $tophit_route = 'NA'; # Default the intersect values to null.
+                my $intersect_ID = 0; my $intersect_name = 'NA'; my $tophit_ID = 0; my $tophit_route = 0; # Default the intersect values to null. Note that routes are 
                 my @tophit_info = split ("\t", $all_hit_info[0]); # tophit is the top BLAST hit. Unless the top hit wasn't identified, it's also the first BLAST taxon. We ignore unidentified hits.
         
                 $tophit_ID = $tophit_info[0];
-                #if ($tophit_ID eq 'NA') { print "\t\tCould not identify top hit. ID is 'NA'. Cannot find intersection.\n"; }
+                if ($tophit_ID == 0) {
+                    #print "\t\tCannot identify top hit: ID is 0. Cannot find intersection.\n";
+                    print $log_filehandle "\t\tCannot identify top hit: ID is 0. Cannot find intersection.\n";
+                }
                 
                 if ($number_of_finished_blast_hits > 1) { # If there is more than one BLAST hit:
-                        unless ($tophit_ID eq 'NA') { # The BLAST taxa might not all be the same, but if the top taxon has ID 0, a proper ID was never found and we can't calculate an intersect.
-                            $tophit_route = retrieve_taxonomic_structure ($tophit_ID, $nodesfileDBM); # retrieve_taxonomic_structure() returns the route from this taxon down to the root.
-                            my $contrastinghit_route = retrieve_taxonomic_structure ($contrastinghit_ID, $nodesfileDBM);
-                            $intersect_ID = find_taxonomic_intersect ($tophit_route, $contrastinghit_route); # find_taxonomic_intersect() returns the lowest shared rank between the two routes. If there wasn't any shared taxon or if one or more routes were undefined, it returns an ID of 0.
+                    unless ($tophit_ID == 0) { # The BLAST taxa might not all be the same, but if the top taxon has ID 0, a proper ID was never found and we can't calculate an intersect.
+                        $tophit_route = retrieve_taxonomic_structure ($tophit_ID, $nodesfileDBM); # retrieve_taxonomic_structure() returns the route from this taxon down to the root.
+                        my $contrastinghit_route = retrieve_taxonomic_structure ($contrastinghit_ID, $nodesfileDBM);
+                        $intersect_ID = find_taxonomic_intersect ($tophit_route, $contrastinghit_route); # find_taxonomic_intersect() returns the lowest shared rank between the two routes. If there wasn't any shared taxon or if one or more routes were undefined, it returns an ID of 0.
                             
-                            if ($intersect_ID eq 'NA') {
-                                    $intersect_name = 'NA';
-                            } else { # If there was an intersect, find its name.
-                                    $intersect_name = retrieve_name ($intersect_ID, $namesfileDBM);
-                            }	
-                        }
+                        if ($intersect_ID == 0) {
+                                $intersect_name = 'NA';
+                        } else { # If there was an intersect, find its name.
+                                $intersect_name = retrieve_name ($intersect_ID, $namesfileDBM);
+                        }	
+                    }
                 }
                 
          
@@ -407,7 +420,7 @@ sub PIA {
                     $tophit_name = $tophit_info[1];
                 }  
                 
-                my $bottom_intersect_ID = 'NA'; my $bottom_intersect_name = 'NA'; my $bottomhit_ID = 'NA'; my $bottomhit_name = 'NA'; # Default to null values.
+                my $bottom_intersect_ID = 0; my $bottom_intersect_name = 'NA'; my $bottomhit_ID = 0; my $bottomhit_name = 'NA'; # Default to null values.
                 
                 if ($number_of_finished_blast_hits == 1) { # If there was only one hit in the end, the bottom hit is the same as the top hit, as is the intersect.
                     $bottom_intersect_ID = $tophit_ID; $bottom_intersect_name = $tophit_name;
@@ -425,12 +438,12 @@ sub PIA {
                         $bottomhit_ID = $bottomhit_info[0];
                         $bottomhit_name = $bottomhit_info[1];
         
-                        unless ($bottomhit_ID eq 'NA') { # If the bottom hit doesn't have an ID, we can't calculate a top intersection.
+                        unless ($bottomhit_ID == 0) { # If the bottom hit doesn't have an ID, we can't calculate a top intersection.
                             my $bottomhit_route = retrieve_taxonomic_structure ($bottomhit_ID, $nodesfileDBM);
                             $bottom_intersect_ID = find_taxonomic_intersect ($tophit_route, $bottomhit_route);
                         }
                         
-                        if ($bottom_intersect_ID eq 'NA') {			
+                        if ($bottom_intersect_ID == 0) {			
                             $bottom_intersect_name = 'NA';
                         } else {
                             $bottom_intersect_name = retrieve_name ($bottom_intersect_ID, $namesfileDBM);
@@ -520,7 +533,7 @@ sub PIA {
         }
 
 
-        if (exists $hit_taxa{$ID} or $ID eq 'N/A' or $ID == 0) { next BLASTLINE; } # If we already have a hit from this organism, or if the ID for this hit is 'N/A' (some references aren't identified) or 0 (tried and failed to find an intersection), skip this hit.
+        if (exists $hit_taxa{$ID} or $ID eq 'N/A' or $ID == 0) { next BLASTLINE; } # If we already have a hit from this organism, or if the ID for this hit is 'N/A' (some references aren't identified), or if the ID is 0 (tried and failed to find a phylogenetic intersection), skip this hit.
 
         my $number_of_taxa_before_this_hit = keys %hit_taxa;
 
@@ -551,11 +564,11 @@ sub PIA {
 sub retrieve_name {
 ##### Use taxonomic ID to get name
 	my ($query_ID, $namesfileDBM) = @_; # $query_ID is the taxonomic ID in question. We want to find its name.
-	my $name = 'none found'; # Default to null.
+	my $name = 'NA'; # Default to null.
     
     unless ($query_ID == 0) { # ID 0 is null. It's not in the names file.
         my %namesfileDBM = (); # Set up a fresh hash to hold the names DBM file.
-        tie (%namesfileDBM, "DB_File", $namesfileDBM, O_RDONLY, 0666, $DB_BTREE) or die "Can't open $namesfileDBM: $!\n";
+        tie (%namesfileDBM, "DB_File", $namesfileDBM, O_RDONLY, 0666, $DB_BTREE) or die "Cannot open $namesfileDBM: $!\n";
         
         if (exists $namesfileDBM{$query_ID}) {
             $name = $namesfileDBM{$query_ID};
@@ -577,7 +590,7 @@ sub retrieve_taxonomic_structure {
         my $next_level_ID; # The ID of the parent node.
         my @route = (); # @route is a list of tab-separated taxonomic IDs moving down from the current node.
         my %nodesfileDBM = (); # Set up a fresh hash to hold the nodes DBM file.
-        tie (%nodesfileDBM, "DB_File", $nodesfileDBM, O_RDONLY, 0666, $DB_BTREE) or die "Can't open $nodesfileDBM: $!\n";
+        tie (%nodesfileDBM, "DB_File", $nodesfileDBM, O_RDONLY, 0666, $DB_BTREE) or die "Cannot open $nodesfileDBM: $!\n";
         
         do {
             push (@route, $query_ID); # Add the current ID to @route.
@@ -622,7 +635,7 @@ sub summary_basic {
         my @line = split("\t", $line);
         my $tax_diversity_score = $line[14]; # Taxonomic diversity score is in the 14th column.
         
-        if ( ($tax_diversity_score ne 'NA') && ($tax_diversity_score >= $min_taxdiv_score) && ($line[16] ne 'NA') ) { # If the taxonomic diversity score is both not NA and also at least the minimum, and a phylogenetic intersection was found:
+        if ( ($tax_diversity_score ne 'NA') && ($tax_diversity_score >= $min_taxdiv_score) && ($line[16] != 0) ) { # If the taxonomic diversity score is both not NA and also at least the minimum, and a phylogenetic intersection ID was found:
             my $taxon_ID_and_name = "$line[16]\t$line[15]"; # Join the ID and name with a tab.
                     
             # Add to the hash:
@@ -669,7 +682,7 @@ sub summary_reads {
         my @line = split("\t", $line);
         my $tax_diversity_score = $line[14]; # Taxonomic diversity score is in the 14th column.
         
-        if ( ($tax_diversity_score ne 'NA') && ($tax_diversity_score >= $min_taxdiv_score) && ($line[16] ne 'NA') ) { # If the taxonomic diversity score is both not NA and also at least the minimum, and a phylogenetic intersection was found:
+        if ( ($tax_diversity_score ne 'NA') && ($tax_diversity_score >= $min_taxdiv_score) && ($line[16] != 0) ) { # If the taxonomic diversity score is both not NA and also at least the minimum, and a phylogenetic intersection ID was found:
             print $summary_reads_filehandle "$line[0]\t$line[16]\t$line[15]\n"; # Print the read name and phylogenetic intersection name and ID the hash.
         }
 	}

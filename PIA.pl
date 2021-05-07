@@ -6,7 +6,7 @@
 ## split and run Phylogenetic Intersection Analysis ##
 ############## Roselyn ware, UoW 2018 ################
 ######################################################
-############## Version 5.6, 2021-05-06 ###############
+############## Version 5.6, 2021-05-07 ###############
 ######################################################
 
 my $PIA_version = '5.6'; # String instead of numeric because otherwise perl can 'helpfully' remove '.0'.
@@ -79,6 +79,16 @@ Optional
         $blast_filepath = $options{b};
     } else {
         print "\nSpecify a BLAST file with -b.\n\n";
+        exit;
+    }
+    
+##### Check names.dmp.dbm and nodes.dmp.dbm file paths #####
+    unless (-e 'Reference_files/names.dmp.dbm') {
+        print "\nCannot find names DBM at Reference_files/names.dmp.dbm. You may need to run PIA_index_maker.pl.\n\n";
+        exit;
+    }
+    unless (-e 'Reference_files/nodes.dmp.dbm') {
+        print "\nCannot find nodes DBM at Reference_files/nodes.dmp.dbm. You may need to run PIA_index_maker.pl.\n\n";
         exit;
     }
 
@@ -252,6 +262,23 @@ my $timestamp_end = localtime();
 foreach my $split_log_filepath (@logs) {
 	chomp($split_log_filepath);
 	system("cat $split_log_filepath >> $log_filepath");
+}
+
+# Quickly scan the log for any warning messages about not being able to identify an ID. If one is found, stop and print a warning message.
+open(my $log_filehandle, $log_filepath) or die "Could not open log file $log_filepath: $!\n";
+readline($log_filehandle); # Skip the header.
+while(1) {
+    my $line = readline($log_filehandle);
+    if (! defined $line) { last; } # If there is no next line, exit the loop. You've processed the whole file.
+    
+    if (index($line, 'was not found in nodes file') != -1) {
+        print "WARNING: At least one taxonomic ID was not found in the names or nodes DBM. Check they have a similar date to your BLAST database and maybe run PIA again.\n\n";
+        last; # That's enough.
+    }
+    if (index($line, 'Cannot identify top hit') != -1) {
+        print "WARNING: At least one taxonomic ID was not found in the names or nodes DBM. Check they have a similar date to your BLAST database and maybe run PIA again.\n\n";
+        last; # That's enough.
+    }
 }
 
 
