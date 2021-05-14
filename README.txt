@@ -33,7 +33,7 @@ BLASTing your input FASTA
 Setting up PIA
 --------------
 -   PIA requires names.dmp and nodes.dmp from the NCBI taxdump. These should be from a similar date as your BLAST database to maximise compatibility (e.g. taxa are added and taxonomic IDs can change over time).
--   To download the files, go to https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/ and download taxdump.tar.gz. Uncompress.
+-   To download the files, go to https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/ and download taxdump.tar.gz. Uncompress. If you need older versions, look here: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/
 -   Move your names.dmp and nodes.dmp to Reference_files/.
 -   Have all PIA files and directories in the same directory (see tree below). Input FASTAs and BLAST files can be in other directories.
 -   Note that you should be able to run PIA on multiple FASTA files in the same directory simultaneously, but this has not been thoroughly tested.
